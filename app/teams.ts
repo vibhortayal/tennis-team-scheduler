@@ -1,0 +1,1 @@
+export const teams=[['Team #1','Dipesh, Vipin'],['Team #3','Gaurav, Anish'],['Team #4','Amit, Ananth'],['Team #6','Nissarg, Aniket'],['Team #8','Manikumar, Arindam'],['Team #10','Vibhor, Gourav'],['Team #13','Manoj, Srinivas']];
