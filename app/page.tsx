@@ -144,37 +144,77 @@ const addDays = (date: string, days: number) => {
   return `${year}-${month}-${day}`;
 };
 
+const isBlockingStatus = (status: string) => {
+  const value = status.toLowerCase();
+  return value === 'scheduled' || value === 'completed';
+};
+
+const matchIncludesTeam = (matchup: string, teamId: string) => {
+  const marker = `Team #${teamId}`;
+  let from = 0;
+
+  while (from <= matchup.length) {
+    const index = matchup.indexOf(marker, from);
+
+    if (index === -1) {
+      return false;
+    }
+
+    const after = matchup[index + marker.length];
+
+    if (!after || after < '0' || after > '9') {
+      return true;
+    }
+
+    from = index + 1;
+  }
+
+  return false;
+};
+
 const teamIds = (m: Match, g: Group) =>
   groups[g]
-    .filter(([id]) => {
-      const teamPattern = new RegExp(`Team #${id}(?!\\d)`);
-      return teamPattern.test(m.matchup);
-    })
+    .filter(([id]) => matchIncludesTeam(m.matchup, id))
     .map(([id]) => id);
 
-const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
-  allMatches.filter(
-    match =>
-      (match.league_group || 'Group B') === group &&
-      match.status !== 'Cancelled' &&
-      teamIds(match, group).includes(teamId)
-  );
+const isSameFixture = (
+  match: Match,
+  group: Group,
+  firstId: string,
+  secondId: string
+) => {
+  if ((match.league_group || 'Group B') !== group) {
+    return false;
+  }
 
-const alreadyPaired = (
+  const ids = teamIds(match, group);
+
+  return (
+    (ids.includes(firstId) && ids.includes(secondId)) ||
+    (matchIncludesTeam(match.matchup, firstId) &&
+      matchIncludesTeam(match.matchup, secondId))
+  );
+};
+
+const existingFixture = (
   allMatches: Match[],
   group: Group,
   firstId: string,
   secondId: string
 ) =>
-  allMatches.some(match => {
-    const ids = teamIds(match, group);
+  allMatches.find(
+    match =>
+      isBlockingStatus(match.status) &&
+      isSameFixture(match, group, firstId, secondId)
+  );
 
-    return (
-      ids.includes(firstId) &&
-      ids.includes(secondId) &&
-      match.status !== 'Cancelled'
-    );
-  });
+const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
+  allMatches.filter(
+    match =>
+      (match.league_group || 'Group B') === group &&
+      isBlockingStatus(match.status) &&
+      matchIncludesTeam(match.matchup, teamId)
+  );
 
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
@@ -368,7 +408,7 @@ export default function Page() {
       .filter(id => id !== suggestionTeam)
       .filter(
         opponentId =>
-          !alreadyPaired(matches, scheduleGroup, suggestionTeam, opponentId)
+          !existingFixture(matches, scheduleGroup, suggestionTeam, opponentId)
       );
 
     const candidates: Suggestion[] = [];
@@ -436,12 +476,24 @@ export default function Page() {
       ranked.length
         ? `Found ${ranked.length} suggested match${
             ranked.length === 1 ? '' : 'es'
-          }.`
-        : 'No suitable matches found in the next 30 days. Try reducing the rest-day gap.'
+          }. Already scheduled or completed matchups are hidden.`
+        : 'No suitable matches found in the next 30 days. Already scheduled or completed matchups are never suggested.'
     );
   };
 
   const scheduleSuggestion = (suggestion: Suggestion) => {
+    if (existingFixture(matches, scheduleGroup, suggestionTeam, suggestion.opponentId)) {
+      setSuggestionNote(
+        'That matchup is already scheduled or completed, so it cannot be suggested.'
+      );
+      setSuggestions(current =>
+        current.filter(
+          item => item.opponentId !== suggestion.opponentId
+        )
+      );
+      return;
+    }
+
     setGroup(scheduleGroup);
     setEditing(null);
     setFirst(suggestionTeam);
@@ -732,6 +784,7 @@ export default function Page() {
             <h2>Find a fair date and available opponent</h2>
             <p>
               Select your group and team, then set rest-day rules for both sides.
+              Already scheduled or completed matchups are never suggested.
             </p>
           </div>
 
