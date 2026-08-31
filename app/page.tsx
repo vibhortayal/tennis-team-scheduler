@@ -76,6 +76,28 @@ const dateText = (d: string) =>
     day: 'numeric',
   }).format(new Date(`${d}T12:00:00`));
 
+const fremontNow = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+
+  const value = (type: string) =>
+    parts.find(part => part.type === type)?.value || '';
+
+  return `${value('year')}-${value('month')}-${value('day')}T${value(
+    'hour'
+  )}:${value('minute')}`;
+};
+
+const matchDateTime = (m: Match) =>
+  `${m.match_date}T${m.match_time.slice(0, 5)}`;
+
 const teamIds = (m: Match, g: Group) =>
   groups[g]
     .filter(([id]) => m.matchup.includes(`Team #${id}`))
@@ -183,15 +205,24 @@ export default function Page() {
     [matches, group, filter, team]
   );
 
-  const upcoming = scoped.filter(
-    m =>
-      m.status === 'Scheduled' &&
-      new Date(`${m.match_date}T23:59:59`) >= new Date()
-  );
+  const nowInFremont = fremontNow();
 
-  const completed = scoped.filter(m => m.status === 'Completed');
-  const cancelled = scoped.filter(m => m.status === 'Cancelled');
-  const next = upcoming[0];
+const overdue = scoped.filter(
+  m =>
+    m.status === 'Scheduled' &&
+    matchDateTime(m) < nowInFremont
+);
+
+const upcoming = scoped.filter(
+  m =>
+    m.status === 'Scheduled' &&
+    matchDateTime(m) >= nowInFremont
+);
+
+const completed = scoped.filter(m => m.status === 'Completed');
+const cancelled = scoped.filter(m => m.status === 'Cancelled');
+const next = upcoming[0];
+
 
   const begin = (m?: Match) => {
     setEditing(m || null);
@@ -307,6 +338,48 @@ export default function Page() {
         .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
         .wide{grid-column:1/-1}
         .actions{margin-top:16px;display:flex;justify-content:flex-end;gap:8px}
+        .overdue-section{
+          margin:20px 0;
+          padding:18px;
+          border:2px solid #d94924;
+          border-radius:16px;
+          background:#fff3ed;
+        }
+
+        .overdue-heading{
+          margin:0 0 6px;
+          color:#a72c11;
+        }
+        
+        .overdue-copy{
+          margin:0 0 16px;
+          color:#8c351f;
+        }
+        
+        .overdue-card{
+          border:2px solid #ef7d58;
+          background:#fffaf7;
+          box-shadow:0 4px 14px rgba(167,44,17,.14);
+        }
+        
+        .overdue-card small{
+          color:#a72c11;
+        }
+        
+        .overdue-card button{
+          background:#c63d1c;
+        }
+        .overdue-badge{
+          display:inline-block;
+          margin-bottom:8px;
+          padding:5px 8px;
+          border-radius:999px;
+          background:#c63d1c;
+          color:#fff;
+          font-size:11px;
+          font-weight:800;
+          letter-spacing:.6px;
+        }
         @media(max-width:650px){
           main{padding:14px}
           .grid,.fields{grid-template-columns:1fr}
@@ -386,6 +459,39 @@ export default function Page() {
           ))}
         </select>
       </div>
+{overdue.length > 0 && (
+  <section className="overdue-section">
+    <h2 className="overdue-heading">
+      Action required — {overdue.length} past match
+      {overdue.length === 1 ? '' : 'es'}
+    </h2>
+
+    <p className="overdue-copy">
+      These scheduled match times have passed in Fremont. Update each match as
+      completed with a result, or cancel it with a reason.
+    </p>
+
+    <div className="grid">
+      {overdue.map(m => (
+        <article className="card overdue-card" key={m.id}>
+          <div className="overdue-badge">UPDATE REQUIRED</div>
+
+          <small>
+            {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
+            <b>Scheduled</b>
+          </small>
+
+          <h3>{m.matchup}</h3>
+          <p>{m.court}</p>
+
+          <button onClick={() => begin(m)}>
+            Update match details
+          </button>
+        </article>
+      ))}
+    </div>
+  </section>
+)}
 
       <Section
         title="Upcoming matches"
