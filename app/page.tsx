@@ -185,7 +185,7 @@ export default function Page() {
 
   const upcoming = scoped.filter(
     m =>
-      ['Scheduled', 'Pending'].includes(m.status) &&
+      m.status === 'Scheduled' &&
       new Date(`${m.match_date}T23:59:59`) >= new Date()
   );
 
@@ -198,6 +198,7 @@ export default function Page() {
 
     if (m) {
       setDraft({ ...m, league_group: group });
+
       const ids = teamIds(m, group);
       setFirst(ids[0] || roster[0][0]);
       setSecond(ids[1] || roster[1][0]);
@@ -320,6 +321,7 @@ export default function Page() {
           <b>🎾 Tennis League</b>
           <div>Group-stage match dashboard</div>
         </div>
+
         <button onClick={() => begin()}>Schedule match</button>
       </header>
 
@@ -348,6 +350,7 @@ export default function Page() {
             </p>
             <button onClick={() => begin(next)}>Update match</button>
           </div>
+
           <div className="badge">UPCOMING</div>
         </section>
       ) : (
@@ -357,12 +360,13 @@ export default function Page() {
             <h1>No upcoming matches scheduled.</h1>
             <p>Schedule the next match to get started.</p>
           </div>
+
           <button onClick={() => begin()}>Schedule match</button>
         </section>
       )}
 
       <div className="filters">
-        {['All', 'Scheduled', 'Pending', 'Completed', 'Cancelled'].map(x => (
+        {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
           <button
             className={filter === x ? 'active' : ''}
             onClick={() => setFilter(x)}
@@ -374,6 +378,7 @@ export default function Page() {
 
         <select value={team} onChange={e => setTeam(e.target.value)}>
           <option value="">All {group} teams</option>
+
           {roster.map(([id]) => (
             <option value={id} key={id}>
               {label(group, id)}
@@ -413,6 +418,7 @@ export default function Page() {
             <div className="fields">
               <label className="field">
                 First team
+
                 <select value={first} onChange={e => setFirst(e.target.value)}>
                   {roster
                     .filter(x => x[0] !== second)
@@ -426,6 +432,7 @@ export default function Page() {
 
               <label className="field">
                 Opponent
+
                 <select value={second} onChange={e => setSecond(e.target.value)}>
                   {roster
                     .filter(x => x[0] !== first)
@@ -439,6 +446,7 @@ export default function Page() {
 
               <label className="field">
                 Date
+
                 <input
                   type="date"
                   value={draft.match_date}
@@ -450,6 +458,7 @@ export default function Page() {
 
               <label className="field">
                 Time
+
                 <input
                   type="time"
                   value={draft.match_time}
@@ -461,6 +470,7 @@ export default function Page() {
 
               <label className="field">
                 Court
+
                 <input
                   value={draft.court}
                   onChange={e => setDraft({ ...draft, court: e.target.value })}
@@ -469,11 +479,14 @@ export default function Page() {
 
               <label className="field">
                 Status
+
                 <select
                   value={draft.status}
-                  onChange={e => setDraft({ ...draft, status: e.target.value })}
+                  onChange={e =>
+                    setDraft({ ...draft, status: e.target.value })
+                  }
                 >
-                  {['Pending', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
+                  {['Scheduled', 'Completed', 'Cancelled'].map(x => (
                     <option key={x}>{x}</option>
                   ))}
                 </select>
@@ -482,6 +495,7 @@ export default function Page() {
               {draft.status === 'Completed' && (
                 <label className="field wide">
                   Result
+
                   <textarea
                     value={draft.result || ''}
                     onChange={e =>
@@ -494,6 +508,7 @@ export default function Page() {
               {draft.status === 'Cancelled' && (
                 <label className="field wide">
                   Cancellation reason
+
                   <textarea
                     value={draft.cancellation_reason || ''}
                     onChange={e =>
@@ -511,6 +526,7 @@ export default function Page() {
               <button type="button" onClick={() => setOpen(false)}>
                 Cancel
               </button>
+
               <button>Save match</button>
             </div>
           </form>
