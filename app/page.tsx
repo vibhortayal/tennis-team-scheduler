@@ -221,12 +221,12 @@ const restGapAroundDate = (teamMatches: Match[], date: string) => {
     .filter(match => match.match_date < date)
     .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
 
-  const next = teamMatches
+  const nextMatch = teamMatches
     .filter(match => match.match_date > date)
     .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
 
   const previousGap = previous ? daysBetween(previous.match_date, date) : 99;
-  const nextGap = next ? daysBetween(date, next.match_date) : 99;
+  const nextGap = nextMatch ? daysBetween(date, nextMatch.match_date) : 99;
 
   return Math.min(previousGap, nextGap);
 };
@@ -240,32 +240,38 @@ function TeamLine({ group, id }: { group: Group; id: string }) {
   );
 }
 
-function TeamInfo({
+function teamMatchLine(match: Match, group: Group, id: string) {
+  const opponent = teamIds(match, group).find(teamId => teamId !== id);
+  const vs = opponent ? teamDisplay(group, opponent) : 'Opponent';
+
+  if (match.status.toLowerCase() === 'completed') {
+    return `${dateText(match.match_date)} vs ${vs}${match.result ? ` · ${match.result}` : ''}`;
+  }
+
+  return `${dateText(match.match_date)} vs ${vs} · ${match.match_time.slice(0, 5)} · ${match.court}`;
+}
+
+function TeamContext({
   group,
   id,
   matches,
-  open,
-  onToggle,
 }: {
   group: Group;
   id: string;
   matches: Match[];
-  open: boolean;
-  onToggle: () => void;
 }) {
   const today = currentDateInFremont();
   const teamMatches = matchesForTeam(matches, group, id);
 
-  const played = teamMatches
+  const last = teamMatches
     .filter(match => match.status.toLowerCase() === 'completed')
     .sort(
       (a, b) =>
         b.match_date.localeCompare(a.match_date) ||
         b.match_time.localeCompare(a.match_time)
-    )
-    .slice(0, 4);
+    )[0];
 
-  const upcoming = teamMatches
+  const next = teamMatches
     .filter(
       match =>
         match.status.toLowerCase() === 'scheduled' && match.match_date >= today
@@ -274,61 +280,19 @@ function TeamInfo({
       (a, b) =>
         a.match_date.localeCompare(b.match_date) ||
         a.match_time.localeCompare(b.match_time)
-    )
-    .slice(0, 4);
-
-  const line = (match: Match) => {
-    const opponent = teamIds(match, group).find(teamId => teamId !== id);
-    const vs = opponent ? teamDisplay(group, opponent) : 'Opponent';
-
-    if (match.status.toLowerCase() === 'completed') {
-      return `${dateText(match.match_date)} vs ${vs}${
-        match.result ? ` · ${match.result}` : ''
-      }`;
-    }
-
-    return `${dateText(match.match_date)} vs ${vs} · ${match.match_time.slice(
-      0,
-      5
-    )} · ${match.court}`;
-  };
+    )[0];
 
   return (
     <div className="team-with-info">
       <TeamLine group={group} id={id} />
-      <button
-        type="button"
-        className={`info-icon${open ? ' active' : ''}`}
-        aria-label={`Match history for ${teamDisplay(group, id)}`}
-        onClick={onToggle}
-      >
-        i
-      </button>
-      {open && (
-        <div className="info-popover">
-          <strong>{teamDisplay(group, id)}</strong>
-          <h4>Last played</h4>
-          {played.length ? (
-            <ul>
-              {played.map(match => (
-                <li key={match.id}>{line(match)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>No completed matches.</p>
-          )}
-          <h4>Upcoming</h4>
-          {upcoming.length ? (
-            <ul>
-              {upcoming.map(match => (
-                <li key={match.id}>{line(match)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>No upcoming matches.</p>
-          )}
-        </div>
-      )}
+      <div className="info-inline">
+        <p>
+          <b>Last match:</b> {last ? teamMatchLine(last, group, id) : 'None'}
+        </p>
+        <p>
+          <b>Next match:</b> {next ? teamMatchLine(next, group, id) : 'None'}
+        </p>
+      </div>
     </div>
   );
 }
@@ -419,7 +383,6 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionNote, setSuggestionNote] = useState('');
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
-  const [infoKey, setInfoKey] = useState('');
 
   const roster = groups[group];
   const scheduleRoster = groups[scheduleGroup];
@@ -461,7 +424,6 @@ export default function Page() {
     setSuggestions([]);
     setSuggestionNote('');
     setSuggestionOpponent('');
-    setInfoKey('');
   }, [scheduleGroup]);
 
   const scoped = useMemo(
@@ -533,7 +495,6 @@ export default function Page() {
       setSuggestionNote('Choose your team first.');
       setSuggestions([]);
       setSuggestionOpponent('');
-      setInfoKey('');
       return;
     }
 
@@ -594,7 +555,6 @@ export default function Page() {
 
     setSuggestions(ranked);
     setSuggestionOpponent('');
-    setInfoKey('');
     setSuggestionNote(
       ranked.length
         ? `Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.`
@@ -608,9 +568,7 @@ export default function Page() {
         'That matchup is already scheduled or completed, so it cannot be suggested.'
       );
       setSuggestions(current =>
-        current.filter(
-          item => item.opponentId !== suggestion.opponentId
-        )
+        current.filter(item => item.opponentId !== suggestion.opponentId)
       );
       return;
     }
@@ -725,16 +683,10 @@ export default function Page() {
         .team-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#15231a;font-weight:750}
         .matchup{display:grid;gap:8px;margin:12px 0}
         .versus{color:#758278;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
-        .team-with-info{display:flex;align-items:center;gap:6px;position:relative;min-width:0}
-        .team-with-info .team-line{flex:1;min-width:0}
-        .info-icon{flex:0 0 auto;width:22px;height:22px;padding:0;border-radius:999px;background:#eaf4eb;color:#17663d;font-size:12px;font-weight:800;line-height:22px}
-        .info-icon.active{background:#147a42;color:#fff}
-        .info-popover{position:absolute;left:0;right:auto;top:calc(100% + 6px);z-index:5;width:min(280px,70vw);padding:12px;border:1px solid #c3dac8;border-radius:12px;background:#fff;box-shadow:0 10px 24px rgba(21,35,26,.16)}
-        .info-popover strong{display:block;margin-bottom:8px;font-size:13px}
-        .info-popover h4{margin:8px 0 4px;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#147a42}
-        .info-popover p,.info-popover li{margin:0;color:#47614d;font-size:12px;font-weight:400;line-height:1.45}
-        .info-popover ul{margin:0 0 8px;padding-left:16px}
-        .info-popover li{margin:0 0 4px}
+        .team-with-info{display:grid;gap:6px;min-width:0}
+        .info-inline{padding:8px 10px;border-radius:10px;background:#f1f7f1}
+        .info-inline p{margin:0 0 4px;color:#47614d !important;font-size:12px;font-weight:400;line-height:1.4}
+        .info-inline p:last-child{margin:0}
         .overdue-section{margin:20px 0;padding:18px;border:2px solid #d94924;border-radius:16px;background:#fff3ed}
         .overdue-heading{margin:0 0 6px;color:#a72c11}
         .overdue-copy{margin:0 0 16px;color:#8c351f}
@@ -752,7 +704,7 @@ export default function Page() {
         .suggestion-note{margin:14px 0 0;color:#17663d !important;font-weight:700}
         .suggestion-filter{margin-top:16px;max-width:360px}
         .suggestion-grid{margin-top:16px}
-        .suggestion-card{border-color:#c3dac8;background:#ffffff;overflow:visible}
+        .suggestion-card{border-color:#c3dac8;background:#ffffff}
         .suggestion-card > small{color:#147a42;font-weight:800;letter-spacing:.7px}
         .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
         @media(max-width:650px){
@@ -918,8 +870,8 @@ export default function Page() {
               Select your group and team, then set rest-day rules for both sides.
               Already scheduled or completed matchups are never suggested. Rest
               days count completed matches and scheduled upcoming matches before
-              and after the suggested date. Tap the i next to a team to see last
-              played and upcoming matches.
+              and after the suggested date. Each suggestion shows that team&apos;s
+              last match and next match.
             </p>
           </div>
 
@@ -1017,43 +969,24 @@ export default function Page() {
 
           {visibleSuggestions.length > 0 && (
             <div className="grid suggestion-grid">
-              {visibleSuggestions.map(suggestion => {
-                const cardKey = `${suggestion.opponentId}-${suggestion.date}`;
-
-                return (
+              {visibleSuggestions.map(suggestion => (
                 <article
                   className="card suggestion-card"
-                  key={cardKey}
+                  key={`${suggestion.opponentId}-${suggestion.date}`}
                 >
                   <small>SUGGESTED MATCH</small>
 
                   <div className="matchup">
-                    <TeamInfo
+                    <TeamContext
                       group={scheduleGroup}
                       id={suggestionTeam}
                       matches={matches}
-                      open={infoKey === `${cardKey}-${suggestionTeam}`}
-                      onToggle={() =>
-                        setInfoKey(current =>
-                          current === `${cardKey}-${suggestionTeam}`
-                            ? ''
-                            : `${cardKey}-${suggestionTeam}`
-                        )
-                      }
                     />
                     <span className="versus">vs</span>
-                    <TeamInfo
+                    <TeamContext
                       group={scheduleGroup}
                       id={suggestion.opponentId}
                       matches={matches}
-                      open={infoKey === `${cardKey}-${suggestion.opponentId}`}
-                      onToggle={() =>
-                        setInfoKey(current =>
-                          current === `${cardKey}-${suggestion.opponentId}`
-                            ? ''
-                            : `${cardKey}-${suggestion.opponentId}`
-                        )
-                      }
                     />
                   </div>
 
@@ -1079,8 +1012,7 @@ export default function Page() {
                     Schedule this match
                   </button>
                 </article>
-                );
-              })}
+              ))}
             </div>
           )}
         </section>
