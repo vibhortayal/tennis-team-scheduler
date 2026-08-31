@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type Group = 'Group A' | 'Group B';
+type View = 'dashboard' | 'scheduling';
 
 type Match = {
   id: string;
@@ -18,6 +19,14 @@ type Match = {
 
 type Draft = Omit<Match, 'id'>;
 type Team = readonly [string, string];
+
+type Suggestion = {
+  opponentId: string;
+  date: string;
+  yourGap: number;
+  opponentGap: number;
+  score: number;
+};
 
 const groups: Record<Group, readonly Team[]> = {
   'Group A': [
@@ -119,13 +128,93 @@ const fremontNow = () => {
 const matchDateTime = (m: Match) =>
   `${m.match_date}T${m.match_time.slice(0, 5)}`;
 
+const currentDateInFremont = () => fremontNow().slice(0, 10);
+
+const dayValue = (date: string) => new Date(`${date}T12:00:00`).getTime();
+
+const daysBetween = (from: string, to: string) =>
+  Math.floor((dayValue(to) - dayValue(from)) / 86400000);
+
+const addDays = (date: string, days: number) => {
+  const value = new Date(`${date}T12:00:00`);
+  value.setDate(value.getDate() + days);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isBlockingStatus = (status: string) => {
+  const value = status.toLowerCase();
+  return value === 'scheduled' || value === 'completed';
+};
+
+const matchIncludesTeam = (matchup: string, teamId: string) => {
+  const marker = `Team #${teamId}`;
+  let from = 0;
+
+  while (from <= matchup.length) {
+    const index = matchup.indexOf(marker, from);
+
+    if (index === -1) {
+      return false;
+    }
+
+    const after = matchup[index + marker.length];
+
+    if (!after || after < '0' || after > '9') {
+      return true;
+    }
+
+    from = index + 1;
+  }
+
+  return false;
+};
+
 const teamIds = (m: Match, g: Group) =>
   groups[g]
-    .filter(([id]) => {
-      const teamPattern = new RegExp(`Team #${id}(?!\\d)`);
-      return teamPattern.test(m.matchup);
-    })
+    .filter(([id]) => matchIncludesTeam(m.matchup, id))
     .map(([id]) => id);
+
+const isSameFixture = (
+  match: Match,
+  group: Group,
+  firstId: string,
+  secondId: string
+) => {
+  if ((match.league_group || 'Group B') !== group) {
+    return false;
+  }
+
+  const ids = teamIds(match, group);
+
+  return (
+    (ids.includes(firstId) && ids.includes(secondId)) ||
+    (matchIncludesTeam(match.matchup, firstId) &&
+      matchIncludesTeam(match.matchup, secondId))
+  );
+};
+
+const existingFixture = (
+  allMatches: Match[],
+  group: Group,
+  firstId: string,
+  secondId: string
+) =>
+  allMatches.find(
+    match =>
+      isBlockingStatus(match.status) &&
+      isSameFixture(match, group, firstId, secondId)
+  );
+
+const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
+  allMatches.filter(
+    match =>
+      (match.league_group || 'Group B') === group &&
+      isBlockingStatus(match.status) &&
+      matchIncludesTeam(match.matchup, teamId)
+  );
 
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
@@ -204,7 +293,9 @@ function Section({
 }
 
 export default function Page() {
+  const [view, setView] = useState<View>('dashboard');
   const [group, setGroup] = useState<Group>('Group B');
+  const [scheduleGroup, setScheduleGroup] = useState<Group>('Group B');
   const [matches, setMatches] = useState<Match[]>([]);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
@@ -214,8 +305,14 @@ export default function Page() {
   const [editing, setEditing] = useState<Match | null>(null);
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [suggestionTeam, setSuggestionTeam] = useState('');
+  const [yourGapDays, setYourGapDays] = useState(3);
+  const [opponentGapDays, setOpponentGapDays] = useState(3);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionNote, setSuggestionNote] = useState('');
 
   const roster = groups[group];
+  const scheduleRoster = groups[scheduleGroup];
 
   const load = async () => {
     if (!api || !key) {
@@ -241,10 +338,19 @@ export default function Page() {
 
   useEffect(() => {
     setTeam('');
-    setFirst(groups[group][0][0]);
-    setSecond(groups[group][1][0]);
-    setDraft(blank(group));
+
+    if (!open) {
+      setFirst(groups[group][0][0]);
+      setSecond(groups[group][1][0]);
+      setDraft(blank(group));
+    }
   }, [group]);
+
+  useEffect(() => {
+    setSuggestionTeam('');
+    setSuggestions([]);
+    setSuggestionNote('');
+  }, [scheduleGroup]);
 
   const scoped = useMemo(
     () =>
@@ -260,15 +366,11 @@ export default function Page() {
   const nowInFremont = fremontNow();
 
   const overdue = scoped.filter(
-    m =>
-      m.status === 'Scheduled' &&
-      matchDateTime(m) < nowInFremont
+    m => m.status === 'Scheduled' && matchDateTime(m) < nowInFremont
   );
 
   const upcoming = scoped.filter(
-    m =>
-      m.status === 'Scheduled' &&
-      matchDateTime(m) >= nowInFremont
+    m => m.status === 'Scheduled' && matchDateTime(m) >= nowInFremont
   );
 
   const completed = scoped.filter(m => m.status === 'Completed');
@@ -292,6 +394,121 @@ export default function Page() {
     setNote('');
   };
 
+  const findSuggestions = () => {
+    if (!suggestionTeam) {
+      setSuggestionNote('Choose your team first.');
+      setSuggestions([]);
+      return;
+    }
+
+    const today = currentDateInFremont();
+
+    const possibleOpponents = scheduleRoster
+      .map(([id]) => id)
+      .filter(id => id !== suggestionTeam)
+      .filter(
+        opponentId =>
+          !existingFixture(matches, scheduleGroup, suggestionTeam, opponentId)
+      );
+
+    const candidates: Suggestion[] = [];
+
+    for (const opponentId of possibleOpponents) {
+      const yourMatches = matchesForTeam(matches, scheduleGroup, suggestionTeam);
+      const opponentMatches = matchesForTeam(
+        matches,
+        scheduleGroup,
+        opponentId
+      );
+
+      for (let offset = 1; offset <= 30; offset += 1) {
+        const date = addDays(today, offset);
+
+        const youHaveMatch = yourMatches.some(
+          match => match.match_date === date
+        );
+        const opponentHasMatch = opponentMatches.some(
+          match => match.match_date === date
+        );
+
+        if (youHaveMatch || opponentHasMatch) {
+          continue;
+        }
+
+        const yourPrevious = yourMatches
+          .filter(match => match.match_date < date)
+          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+        const opponentPrevious = opponentMatches
+          .filter(match => match.match_date < date)
+          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+        const yourGap = yourPrevious
+          ? daysBetween(yourPrevious.match_date, date)
+          : 99;
+
+        const opponentGap = opponentPrevious
+          ? daysBetween(opponentPrevious.match_date, date)
+          : 99;
+
+        if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
+          continue;
+        }
+
+        candidates.push({
+          opponentId,
+          date,
+          yourGap,
+          opponentGap,
+          score: yourGap + opponentGap,
+        });
+
+        break;
+      }
+    }
+
+    const ranked = candidates
+      .sort((a, b) => b.score - a.score || a.date.localeCompare(b.date))
+      .slice(0, 6);
+
+    setSuggestions(ranked);
+    setSuggestionNote(
+      ranked.length
+        ? `Found ${ranked.length} suggested match${
+            ranked.length === 1 ? '' : 'es'
+          }. Already scheduled or completed matchups are hidden.`
+        : 'No suitable matches found in the next 30 days. Already scheduled or completed matchups are never suggested.'
+    );
+  };
+
+  const scheduleSuggestion = (suggestion: Suggestion) => {
+    if (existingFixture(matches, scheduleGroup, suggestionTeam, suggestion.opponentId)) {
+      setSuggestionNote(
+        'That matchup is already scheduled or completed, so it cannot be suggested.'
+      );
+      setSuggestions(current =>
+        current.filter(
+          item => item.opponentId !== suggestion.opponentId
+        )
+      );
+      return;
+    }
+
+    setGroup(scheduleGroup);
+    setEditing(null);
+    setFirst(suggestionTeam);
+    setSecond(suggestion.opponentId);
+    setDraft({
+      ...blank(scheduleGroup),
+      match_date: suggestion.date,
+      match_time: '19:00',
+      court: 'Court 2',
+      league_group: scheduleGroup,
+    });
+    setOpen(true);
+    setNote('');
+  };
+
   const save = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -310,10 +527,7 @@ export default function Page() {
       return;
     }
 
-    if (
-      draft.status === 'Cancelled' &&
-      !draft.cancellation_reason?.trim()
-    ) {
+    if (draft.status === 'Cancelled' && !draft.cancellation_reason?.trim()) {
       setNote('Enter a cancellation reason.');
       return;
     }
@@ -338,14 +552,11 @@ export default function Page() {
       matchup: `Team #${first} vs Team #${second}`,
     };
 
-    const response = await fetch(
-      editing ? `${api}?id=eq.${editing.id}` : api,
-      {
-        method: editing ? 'PATCH' : 'POST',
-        headers,
-        body: JSON.stringify(body),
-      }
-    );
+    const response = await fetch(editing ? `${api}?id=eq.${editing.id}` : api, {
+      method: editing ? 'PATCH' : 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
     if (!response.ok) {
       setNote('Could not save the match.');
@@ -400,9 +611,21 @@ export default function Page() {
         .overdue-card small{color:#a72c11}
         .overdue-card button{background:#c63d1c}
         .overdue-badge{display:inline-block;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#c63d1c;color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px}
+        .suggestions-panel{margin:6px 0 24px;padding:20px;border:1px solid #cbdccd;border-radius:16px;background:linear-gradient(120deg,#ffffff,#edf8ef)}
+        .suggestions-panel h2{margin:5px 0 8px}
+        .suggestions-panel p{color:#5f7064}
+        .suggestion-step{margin-top:18px}
+        .suggestion-step h3{margin:0 0 8px;font-size:14px}
+        .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
+        .suggest-button{margin-top:16px}
+        .suggestion-note{margin:14px 0 0;color:#17663d !important;font-weight:700}
+        .suggestion-grid{margin-top:16px}
+        .suggestion-card{border-color:#c3dac8;background:#ffffff}
+        .suggestion-card > small{color:#147a42;font-weight:800;letter-spacing:.7px}
+        .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
         @media(max-width:650px){
           main{padding:14px}
-          .grid,.fields{grid-template-columns:1fr}
+          .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
           .wide{grid-column:auto}
           .hero{display:block}
           .badge{display:inline-block;margin-top:12px}
@@ -419,124 +642,268 @@ export default function Page() {
       </header>
 
       <div className="tabs">
-        {(['Group A', 'Group B'] as Group[]).map(g => (
-          <button
-            className={group === g ? 'active' : ''}
-            onClick={() => setGroup(g)}
-            key={g}
-          >
-            {g} · {groups[g].length} teams
-          </button>
-        ))}
+        <button
+          className={view === 'dashboard' ? 'active' : ''}
+          onClick={() => setView('dashboard')}
+        >
+          Match Dashboard
+        </button>
+
+        <button
+          className={view === 'scheduling' ? 'active' : ''}
+          onClick={() => setView('scheduling')}
+        >
+          Smart Scheduling
+        </button>
       </div>
 
       {note && <p className="notice">{note}</p>}
 
-      {next ? (
-        <section className="hero">
-          <div>
-            <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-            <Matchup match={next} group={group} />
-            <p>
-              {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
-              {next.court}
-            </p>
-            <button onClick={() => begin(next)}>Update match</button>
-          </div>
-
-          <div className="badge">UPCOMING</div>
-        </section>
-      ) : (
-        <section className="hero">
-          <div>
-            <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-            <h1>No upcoming matches scheduled.</h1>
-            <p>Schedule the next match to get started.</p>
-          </div>
-
-          <button onClick={() => begin()}>Schedule match</button>
-        </section>
-      )}
-
-      <div className="filters">
-        {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
-          <button
-            className={filter === x ? 'active' : ''}
-            onClick={() => setFilter(x)}
-            key={x}
-          >
-            {x}
-          </button>
-        ))}
-
-        <select value={team} onChange={e => setTeam(e.target.value)}>
-          <option value="">All {group} teams</option>
-
-          {roster.map(([id]) => (
-            <option value={id} key={id}>
-              {teamDisplay(group, id)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {overdue.length > 0 && (
-        <section className="overdue-section">
-          <h2 className="overdue-heading">
-            Action required — {overdue.length} past match
-            {overdue.length === 1 ? '' : 'es'}
-          </h2>
-
-          <p className="overdue-copy">
-            These scheduled match times have passed in Fremont. Update each
-            match as completed with a result, or cancel it with a reason.
-          </p>
-
-          <div className="grid">
-            {overdue.map(m => (
-              <article className="card overdue-card" key={m.id}>
-                <div className="overdue-badge">UPDATE REQUIRED</div>
-
-                <small>
-                  {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
-                  <b>Scheduled</b>
-                </small>
-
-                <Matchup match={m} group={group} />
-                <p>{m.court}</p>
-
-                <button onClick={() => begin(m)}>
-                  Update match details
-                </button>
-              </article>
+      {view === 'dashboard' ? (
+        <>
+          <div className="tabs">
+            {(['Group A', 'Group B'] as Group[]).map(g => (
+              <button
+                className={group === g ? 'active' : ''}
+                onClick={() => setGroup(g)}
+                key={g}
+              >
+                {g} · {groups[g].length} teams
+              </button>
             ))}
           </div>
+
+          {next ? (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
+                <Matchup match={next} group={group} />
+                <p>
+                  {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
+                  {next.court}
+                </p>
+                <button onClick={() => begin(next)}>Update match</button>
+              </div>
+
+              <div className="badge">UPCOMING</div>
+            </section>
+          ) : (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
+                <h1>No upcoming matches scheduled.</h1>
+                <p>Schedule the next match to get started.</p>
+              </div>
+
+              <button onClick={() => begin()}>Schedule match</button>
+            </section>
+          )}
+
+          <div className="filters">
+            {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
+              <button
+                className={filter === x ? 'active' : ''}
+                onClick={() => setFilter(x)}
+                key={x}
+              >
+                {x}
+              </button>
+            ))}
+
+            <select value={team} onChange={e => setTeam(e.target.value)}>
+              <option value="">All {group} teams</option>
+
+              {roster.map(([id]) => (
+                <option value={id} key={id}>
+                  {teamDisplay(group, id)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {overdue.length > 0 && (
+            <section className="overdue-section">
+              <h2 className="overdue-heading">
+                Action required — {overdue.length} past match
+                {overdue.length === 1 ? '' : 'es'}
+              </h2>
+
+              <p className="overdue-copy">
+                These scheduled match times have passed in Fremont. Update each
+                match as completed with a result, or cancel it with a reason.
+              </p>
+
+              <div className="grid">
+                {overdue.map(m => (
+                  <article className="card overdue-card" key={m.id}>
+                    <div className="overdue-badge">UPDATE REQUIRED</div>
+
+                    <small>
+                      {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
+                      <b>Scheduled</b>
+                    </small>
+
+                    <Matchup match={m} group={group} />
+                    <p>{m.court}</p>
+
+                    <button onClick={() => begin(m)}>Update match details</button>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <Section
+            title="Upcoming matches"
+            list={upcoming}
+            edit={begin}
+            empty="No upcoming matches."
+            group={group}
+          />
+
+          <Section
+            title="Recent results"
+            list={completed}
+            edit={begin}
+            empty="No completed matches."
+            group={group}
+          />
+
+          <Section
+            title="Cancelled matches"
+            list={cancelled}
+            edit={begin}
+            empty="No cancelled matches."
+            group={group}
+          />
+        </>
+      ) : (
+        <section className="suggestions-panel">
+          <div>
+            <div className="eyebrow">SMART SCHEDULING</div>
+            <h2>Find a fair date and available opponent</h2>
+            <p>
+              Select your group and team, then set rest-day rules for both sides.
+              Already scheduled or completed matchups are never suggested.
+            </p>
+          </div>
+
+          <div className="suggestion-step">
+            <h3>Step 1 · Select your group</h3>
+            <div className="tabs">
+              {(['Group A', 'Group B'] as Group[]).map(g => (
+                <button
+                  className={scheduleGroup === g ? 'active' : ''}
+                  onClick={() => setScheduleGroup(g)}
+                  key={g}
+                  type="button"
+                >
+                  {g} · {groups[g].length} teams
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="suggestion-step">
+            <h3>Step 2 · Select your team</h3>
+            <label className="field">
+              Your team
+              <select
+                value={suggestionTeam}
+                onChange={e => setSuggestionTeam(e.target.value)}
+              >
+                <option value="">Choose your team</option>
+
+                {scheduleRoster.map(([id]) => (
+                  <option value={id} key={id}>
+                    {teamDisplay(scheduleGroup, id)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="suggestion-step">
+            <h3>Step 3 · Set rest-day rules</h3>
+            <div className="suggestion-fields">
+              <label className="field">
+                Minimum days after your last match
+                <select
+                  value={yourGapDays}
+                  onChange={e => setYourGapDays(Number(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                    <option value={days} key={days}>
+                      {days} day{days === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                Minimum days after opponent&apos;s last match
+                <select
+                  value={opponentGapDays}
+                  onChange={e => setOpponentGapDays(Number(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                    <option value={days} key={days}>
+                      {days} day{days === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <button className="suggest-button" onClick={findSuggestions}>
+            Find available matches
+          </button>
+
+          {suggestionNote && <p className="suggestion-note">{suggestionNote}</p>}
+
+          {suggestions.length > 0 && (
+            <div className="grid suggestion-grid">
+              {suggestions.map(suggestion => (
+                <article
+                  className="card suggestion-card"
+                  key={`${suggestion.opponentId}-${suggestion.date}`}
+                >
+                  <small>SUGGESTED MATCH</small>
+
+                  <div className="matchup">
+                    <TeamLine group={scheduleGroup} id={suggestionTeam} />
+                    <span className="versus">vs</span>
+                    <TeamLine group={scheduleGroup} id={suggestion.opponentId} />
+                  </div>
+
+                  <p>
+                    <b>{dateText(suggestion.date)}</b>
+                    <br />
+                    Suggested start: 7:00 PM
+                  </p>
+
+                  <p className="gap-text">
+                    Your rest:{' '}
+                    {suggestion.yourGap === 99
+                      ? 'No prior match'
+                      : `${suggestion.yourGap} days`}
+                    <br />
+                    Opponent rest:{' '}
+                    {suggestion.opponentGap === 99
+                      ? 'No prior match'
+                      : `${suggestion.opponentGap} days`}
+                  </p>
+
+                  <button onClick={() => scheduleSuggestion(suggestion)}>
+                    Schedule this match
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       )}
-
-      <Section
-        title="Upcoming matches"
-        list={upcoming}
-        edit={begin}
-        empty="No upcoming matches."
-        group={group}
-      />
-
-      <Section
-        title="Recent results"
-        list={completed}
-        edit={begin}
-        empty="No completed matches."
-        group={group}
-      />
-
-      <Section
-        title="Cancelled matches"
-        list={cancelled}
-        edit={begin}
-        empty="No cancelled matches."
-        group={group}
-      />
 
       {open && (
         <div className="modal">
@@ -548,7 +915,6 @@ export default function Page() {
             <div className="fields">
               <label className="field">
                 First team
-
                 <select value={first} onChange={e => setFirst(e.target.value)}>
                   {roster
                     .filter(([id]) => id !== second)
@@ -562,7 +928,6 @@ export default function Page() {
 
               <label className="field">
                 Opponent
-
                 <select value={second} onChange={e => setSecond(e.target.value)}>
                   {roster
                     .filter(([id]) => id !== first)
@@ -576,7 +941,6 @@ export default function Page() {
 
               <label className="field">
                 Date
-
                 <input
                   type="date"
                   value={draft.match_date}
@@ -588,7 +952,6 @@ export default function Page() {
 
               <label className="field">
                 Time
-
                 <input
                   type="time"
                   value={draft.match_time}
@@ -600,23 +963,17 @@ export default function Page() {
 
               <label className="field">
                 Court
-
                 <input
                   value={draft.court}
-                  onChange={e =>
-                    setDraft({ ...draft, court: e.target.value })
-                  }
+                  onChange={e => setDraft({ ...draft, court: e.target.value })}
                 />
               </label>
 
               <label className="field">
                 Status
-
                 <select
                   value={draft.status}
-                  onChange={e =>
-                    setDraft({ ...draft, status: e.target.value })
-                  }
+                  onChange={e => setDraft({ ...draft, status: e.target.value })}
                 >
                   {['Scheduled', 'Completed', 'Cancelled'].map(status => (
                     <option key={status}>{status}</option>
@@ -627,7 +984,6 @@ export default function Page() {
               {draft.status === 'Completed' && (
                 <label className="field wide">
                   Result
-
                   <textarea
                     value={draft.result || ''}
                     onChange={e =>
@@ -640,7 +996,6 @@ export default function Page() {
               {draft.status === 'Cancelled' && (
                 <label className="field wide">
                   Cancellation reason
-
                   <textarea
                     value={draft.cancellation_reason || ''}
                     onChange={e =>
