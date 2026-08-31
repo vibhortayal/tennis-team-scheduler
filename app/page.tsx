@@ -121,18 +121,11 @@ const matchDateTime = (m: Match) =>
 
 const teamIds = (m: Match, g: Group) =>
   groups[g]
-    .filter(([id]) => m.matchup.includes(`Team #${id}`))
+    .filter(([id]) => {
+      const teamPattern = new RegExp(`Team #${id}(?!\\d)`);
+      return teamPattern.test(m.matchup);
+    })
     .map(([id]) => id);
-
-const matchupDisplay = (m: Match, g: Group) => {
-  const ids = teamIds(m, g);
-
-  if (ids.length !== 2) {
-    return m.matchup;
-  }
-
-  return `${teamDisplay(g, ids[0])} vs ${teamDisplay(g, ids[1])}`;
-};
 
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
@@ -186,6 +179,7 @@ function Section({
               </small>
 
               <Matchup match={m} group={group} />
+
               <p>{m.court}</p>
 
               {m.result && (
