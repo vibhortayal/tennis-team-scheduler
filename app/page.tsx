@@ -216,6 +216,21 @@ const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
       matchIncludesTeam(match.matchup, teamId)
   );
 
+const restGapAroundDate = (teamMatches: Match[], date: string) => {
+  const previous = teamMatches
+    .filter(match => match.match_date < date)
+    .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+  const next = teamMatches
+    .filter(match => match.match_date > date)
+    .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
+
+  const previousGap = previous ? daysBetween(previous.match_date, date) : 99;
+  const nextGap = next ? daysBetween(date, next.match_date) : 99;
+
+  return Math.min(previousGap, nextGap);
+};
+
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
     <div className="team-line">
@@ -310,6 +325,7 @@ export default function Page() {
   const [opponentGapDays, setOpponentGapDays] = useState(3);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionNote, setSuggestionNote] = useState('');
+  const [suggestionOpponent, setSuggestionOpponent] = useState('');
 
   const roster = groups[group];
   const scheduleRoster = groups[scheduleGroup];
@@ -350,6 +366,7 @@ export default function Page() {
     setSuggestionTeam('');
     setSuggestions([]);
     setSuggestionNote('');
+    setSuggestionOpponent('');
   }, [scheduleGroup]);
 
   const scoped = useMemo(
@@ -362,6 +379,28 @@ export default function Page() {
       ),
     [matches, group, filter, team]
   );
+
+  const opponentOptions = useMemo(
+    () => Array.from(new Set(suggestions.map(item => item.opponentId))),
+    [suggestions]
+  );
+
+  const visibleSuggestions = useMemo(() => {
+    const filtered = suggestionOpponent
+      ? suggestions.filter(item => item.opponentId === suggestionOpponent)
+      : Object.values(
+          suggestions.reduce<Record<string, Suggestion>>((best, item) => {
+            if (!best[item.opponentId] || item.date < best[item.opponentId].date) {
+              best[item.opponentId] = item;
+            }
+            return best;
+          }, {})
+        );
+
+    return filtered.sort(
+      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
+    );
+  }, [suggestions, suggestionOpponent]);
 
   const nowInFremont = fremontNow();
 
@@ -398,6 +437,7 @@ export default function Page() {
     if (!suggestionTeam) {
       setSuggestionNote('Choose your team first.');
       setSuggestions([]);
+      setSuggestionOpponent('');
       return;
     }
 
@@ -435,21 +475,8 @@ export default function Page() {
           continue;
         }
 
-        const yourPrevious = yourMatches
-          .filter(match => match.match_date < date)
-          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
-
-        const opponentPrevious = opponentMatches
-          .filter(match => match.match_date < date)
-          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
-
-        const yourGap = yourPrevious
-          ? daysBetween(yourPrevious.match_date, date)
-          : 99;
-
-        const opponentGap = opponentPrevious
-          ? daysBetween(opponentPrevious.match_date, date)
-          : 99;
+        const yourGap = restGapAroundDate(yourMatches, date);
+        const opponentGap = restGapAroundDate(opponentMatches, date);
 
         if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
           continue;
@@ -462,22 +489,19 @@ export default function Page() {
           opponentGap,
           score: yourGap + opponentGap,
         });
-
-        break;
       }
     }
 
-    const ranked = candidates
-      .sort((a, b) => b.score - a.score || a.date.localeCompare(b.date))
-      .slice(0, 6);
+    const ranked = candidates.sort(
+      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
+    );
 
     setSuggestions(ranked);
+    setSuggestionOpponent('');
     setSuggestionNote(
       ranked.length
-        ? `Found ${ranked.length} suggested match${
-            ranked.length === 1 ? '' : 'es'
-          }. Already scheduled or completed matchups are hidden.`
-        : 'No suitable matches found in the next 30 days. Already scheduled or completed matchups are never suggested.'
+        ? `Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.`
+        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
     );
   };
 
@@ -619,6 +643,7 @@ export default function Page() {
         .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
         .suggest-button{margin-top:16px}
         .suggestion-note{margin:14px 0 0;color:#17663d !important;font-weight:700}
+        .suggestion-filter{margin-top:16px;max-width:360px}
         .suggestion-grid{margin-top:16px}
         .suggestion-card{border-color:#c3dac8;background:#ffffff}
         .suggestion-card > small{color:#147a42;font-weight:800;letter-spacing:.7px}
@@ -784,7 +809,9 @@ export default function Page() {
             <h2>Find a fair date and available opponent</h2>
             <p>
               Select your group and team, then set rest-day rules for both sides.
-              Already scheduled or completed matchups are never suggested.
+              Already scheduled or completed matchups are never suggested. Rest
+              days count completed matches and scheduled upcoming matches before
+              and after the suggested date.
             </p>
           </div>
 
@@ -863,8 +890,26 @@ export default function Page() {
           {suggestionNote && <p className="suggestion-note">{suggestionNote}</p>}
 
           {suggestions.length > 0 && (
+            <label className="field suggestion-filter">
+              Filter by opponent
+              <select
+                value={suggestionOpponent}
+                onChange={e => setSuggestionOpponent(e.target.value)}
+              >
+                <option value="">All opponents</option>
+
+                {opponentOptions.map(id => (
+                  <option value={id} key={id}>
+                    {teamDisplay(scheduleGroup, id)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {visibleSuggestions.length > 0 && (
             <div className="grid suggestion-grid">
-              {suggestions.map(suggestion => (
+              {visibleSuggestions.map(suggestion => (
                 <article
                   className="card suggestion-card"
                   key={`${suggestion.opponentId}-${suggestion.date}`}
@@ -886,12 +931,12 @@ export default function Page() {
                   <p className="gap-text">
                     Your rest:{' '}
                     {suggestion.yourGap === 99
-                      ? 'No prior match'
+                      ? 'No nearby match'
                       : `${suggestion.yourGap} days`}
                     <br />
                     Opponent rest:{' '}
                     {suggestion.opponentGap === 99
-                      ? 'No prior match'
+                      ? 'No nearby match'
                       : `${suggestion.opponentGap} days`}
                   </p>
 
