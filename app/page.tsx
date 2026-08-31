@@ -216,6 +216,21 @@ const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
       matchIncludesTeam(match.matchup, teamId)
   );
 
+const restGapAroundDate = (teamMatches: Match[], date: string) => {
+  const previous = teamMatches
+    .filter(match => match.match_date < date)
+    .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+  const next = teamMatches
+    .filter(match => match.match_date > date)
+    .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
+
+  const previousGap = previous ? daysBetween(previous.match_date, date) : 99;
+  const nextGap = next ? daysBetween(date, next.match_date) : 99;
+
+  return Math.min(previousGap, nextGap);
+};
+
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
     <div className="team-line">
@@ -460,21 +475,8 @@ export default function Page() {
           continue;
         }
 
-        const yourPrevious = yourMatches
-          .filter(match => match.match_date < date)
-          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
-
-        const opponentPrevious = opponentMatches
-          .filter(match => match.match_date < date)
-          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
-
-        const yourGap = yourPrevious
-          ? daysBetween(yourPrevious.match_date, date)
-          : 99;
-
-        const opponentGap = opponentPrevious
-          ? daysBetween(opponentPrevious.match_date, date)
-          : 99;
+        const yourGap = restGapAroundDate(yourMatches, date);
+        const opponentGap = restGapAroundDate(opponentMatches, date);
 
         if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
           continue;
@@ -498,8 +500,8 @@ export default function Page() {
     setSuggestionOpponent('');
     setSuggestionNote(
       ranked.length
-        ? `Found suggested matches, sorted by date. Already scheduled or completed matchups are hidden.`
-        : 'No suitable matches found in the next 30 days. Already scheduled or completed matchups are never suggested.'
+        ? `Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.`
+        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
     );
   };
 
@@ -807,7 +809,9 @@ export default function Page() {
             <h2>Find a fair date and available opponent</h2>
             <p>
               Select your group and team, then set rest-day rules for both sides.
-              Already scheduled or completed matchups are never suggested.
+              Already scheduled or completed matchups are never suggested. Rest
+              days count completed matches and scheduled upcoming matches before
+              and after the suggested date.
             </p>
           </div>
 
@@ -927,12 +931,12 @@ export default function Page() {
                   <p className="gap-text">
                     Your rest:{' '}
                     {suggestion.yourGap === 99
-                      ? 'No prior match'
+                      ? 'No nearby match'
                       : `${suggestion.yourGap} days`}
                     <br />
                     Opponent rest:{' '}
                     {suggestion.opponentGap === 99
-                      ? 'No prior match'
+                      ? 'No nearby match'
                       : `${suggestion.opponentGap} days`}
                   </p>
 
