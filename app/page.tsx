@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type Group = 'Group A' | 'Group B';
+
 type Match = {
   id: string;
   matchup: string;
@@ -14,6 +15,7 @@ type Match = {
   cancellation_reason?: string | null;
   league_group?: Group;
 };
+
 type Draft = Omit<Match, 'id'>;
 type Team = readonly [string, string];
 
@@ -53,9 +55,28 @@ const headers = {
   Prefer: 'return=representation',
 };
 
-const label = (g: Group, id: string) => {
-  const t = groups[g].find(x => x[0] === id);
-  return t ? `Team #${t[0]} — ${t[1]}` : `Team #${id}`;
+const teamDisplay = (g: Group, id: string) => {
+  const team = groups[g].find(([teamId]) => teamId === id);
+
+  if (!team) {
+    return `#${id}`;
+  }
+
+  const [first, second] = team[1].split(',').map(name => name.trim());
+
+  return `#${team[0]} · ${first} & ${second}`;
+};
+
+const teamNames = (g: Group, id: string) => {
+  const team = groups[g].find(([teamId]) => teamId === id);
+
+  if (!team) {
+    return `Team #${id}`;
+  }
+
+  const [first, second] = team[1].split(',').map(name => name.trim());
+
+  return `${first} & ${second}`;
 };
 
 const blank = (g: Group): Draft => ({
@@ -103,16 +124,53 @@ const teamIds = (m: Match, g: Group) =>
     .filter(([id]) => m.matchup.includes(`Team #${id}`))
     .map(([id]) => id);
 
+const matchupDisplay = (m: Match, g: Group) => {
+  const ids = teamIds(m, g);
+
+  if (ids.length !== 2) {
+    return m.matchup;
+  }
+
+  return `${teamDisplay(g, ids[0])} vs ${teamDisplay(g, ids[1])}`;
+};
+
+function TeamLine({ group, id }: { group: Group; id: string }) {
+  return (
+    <div className="team-line">
+      <span className="team-number">#{id}</span>
+      <span className="team-names">{teamNames(group, id)}</span>
+    </div>
+  );
+}
+
+function Matchup({ match, group }: { match: Match; group: Group }) {
+  const ids = teamIds(match, group);
+
+  if (ids.length !== 2) {
+    return <h3>{match.matchup}</h3>;
+  }
+
+  return (
+    <div className="matchup">
+      <TeamLine group={group} id={ids[0]} />
+      <span className="versus">vs</span>
+      <TeamLine group={group} id={ids[1]} />
+    </div>
+  );
+}
+
 function Section({
   title,
   list,
   edit,
   empty,
+  group,
 }: {
   title: string;
   list: Match[];
   edit: (m: Match) => void;
   empty: string;
+  group: Group;
 }) {
   return (
     <section>
@@ -127,7 +185,7 @@ function Section({
                 <b>{m.status}</b>
               </small>
 
-              <h3>{m.matchup}</h3>
+              <Matchup match={m} group={group} />
               <p>{m.court}</p>
 
               {m.result && (
@@ -171,13 +229,13 @@ export default function Page() {
       return;
     }
 
-    const r = await fetch(
+    const response = await fetch(
       `${api}?select=*&order=match_date.asc,match_time.asc`,
       { headers }
     );
 
-    if (r.ok) {
-      setMatches(await r.json());
+    if (response.ok) {
+      setMatches(await response.json());
     } else {
       setNote('Could not load matches.');
     }
@@ -207,22 +265,21 @@ export default function Page() {
 
   const nowInFremont = fremontNow();
 
-const overdue = scoped.filter(
-  m =>
-    m.status === 'Scheduled' &&
-    matchDateTime(m) < nowInFremont
-);
+  const overdue = scoped.filter(
+    m =>
+      m.status === 'Scheduled' &&
+      matchDateTime(m) < nowInFremont
+  );
 
-const upcoming = scoped.filter(
-  m =>
-    m.status === 'Scheduled' &&
-    matchDateTime(m) >= nowInFremont
-);
+  const upcoming = scoped.filter(
+    m =>
+      m.status === 'Scheduled' &&
+      matchDateTime(m) >= nowInFremont
+  );
 
-const completed = scoped.filter(m => m.status === 'Completed');
-const cancelled = scoped.filter(m => m.status === 'Cancelled');
-const next = upcoming[0];
-
+  const completed = scoped.filter(m => m.status === 'Completed');
+  const cancelled = scoped.filter(m => m.status === 'Cancelled');
+  const next = upcoming[0];
 
   const begin = (m?: Match) => {
     setEditing(m || null);
@@ -284,10 +341,10 @@ const next = upcoming[0];
     const body = {
       ...draft,
       league_group: group,
-      matchup: `${label(group, first)} vs ${label(group, second)}`,
+      matchup: `Team #${first} vs Team #${second}`,
     };
 
-    const r = await fetch(
+    const response = await fetch(
       editing ? `${api}?id=eq.${editing.id}` : api,
       {
         method: editing ? 'PATCH' : 'POST',
@@ -296,7 +353,7 @@ const next = upcoming[0];
       }
     );
 
-    if (!r.ok) {
+    if (!response.ok) {
       setNote('Could not save the match.');
       return;
     }
@@ -328,7 +385,6 @@ const next = upcoming[0];
         select,input,textarea{padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:white}
         .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
         .card{padding:16px}
-        .card h3{margin:10px 0}
         .card p{color:#5f7064}
         .empty,.notice{background:#fff;padding:16px;border-radius:12px;color:#5f7064}
         .notice{color:#17663d}
@@ -338,48 +394,18 @@ const next = upcoming[0];
         .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
         .wide{grid-column:1/-1}
         .actions{margin-top:16px;display:flex;justify-content:flex-end;gap:8px}
-        .overdue-section{
-          margin:20px 0;
-          padding:18px;
-          border:2px solid #d94924;
-          border-radius:16px;
-          background:#fff3ed;
-        }
-
-        .overdue-heading{
-          margin:0 0 6px;
-          color:#a72c11;
-        }
-        
-        .overdue-copy{
-          margin:0 0 16px;
-          color:#8c351f;
-        }
-        
-        .overdue-card{
-          border:2px solid #ef7d58;
-          background:#fffaf7;
-          box-shadow:0 4px 14px rgba(167,44,17,.14);
-        }
-        
-        .overdue-card small{
-          color:#a72c11;
-        }
-        
-        .overdue-card button{
-          background:#c63d1c;
-        }
-        .overdue-badge{
-          display:inline-block;
-          margin-bottom:8px;
-          padding:5px 8px;
-          border-radius:999px;
-          background:#c63d1c;
-          color:#fff;
-          font-size:11px;
-          font-weight:800;
-          letter-spacing:.6px;
-        }
+        .team-line{display:flex;align-items:center;gap:8px;min-width:0}
+        .team-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:32px;height:26px;padding:0 8px;border-radius:999px;background:#eaf4eb;color:#17663d;font-size:12px;font-weight:800}
+        .team-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#15231a;font-weight:750}
+        .matchup{display:grid;gap:8px;margin:12px 0}
+        .versus{color:#758278;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
+        .overdue-section{margin:20px 0;padding:18px;border:2px solid #d94924;border-radius:16px;background:#fff3ed}
+        .overdue-heading{margin:0 0 6px;color:#a72c11}
+        .overdue-copy{margin:0 0 16px;color:#8c351f}
+        .overdue-card{border:2px solid #ef7d58;background:#fffaf7;box-shadow:0 4px 14px rgba(167,44,17,.14)}
+        .overdue-card small{color:#a72c11}
+        .overdue-card button{background:#c63d1c}
+        .overdue-badge{display:inline-block;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#c63d1c;color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px}
         @media(max-width:650px){
           main{padding:14px}
           .grid,.fields{grid-template-columns:1fr}
@@ -416,7 +442,7 @@ const next = upcoming[0];
         <section className="hero">
           <div>
             <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-            <h1>{next.matchup}</h1>
+            <Matchup match={next} group={group} />
             <p>
               {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
               {next.court}
@@ -454,50 +480,52 @@ const next = upcoming[0];
 
           {roster.map(([id]) => (
             <option value={id} key={id}>
-              {label(group, id)}
+              {teamDisplay(group, id)}
             </option>
           ))}
         </select>
       </div>
-{overdue.length > 0 && (
-  <section className="overdue-section">
-    <h2 className="overdue-heading">
-      Action required — {overdue.length} past match
-      {overdue.length === 1 ? '' : 'es'}
-    </h2>
 
-    <p className="overdue-copy">
-      These scheduled match times have passed in Fremont. Update each match as
-      completed with a result, or cancel it with a reason.
-    </p>
+      {overdue.length > 0 && (
+        <section className="overdue-section">
+          <h2 className="overdue-heading">
+            Action required — {overdue.length} past match
+            {overdue.length === 1 ? '' : 'es'}
+          </h2>
 
-    <div className="grid">
-      {overdue.map(m => (
-        <article className="card overdue-card" key={m.id}>
-          <div className="overdue-badge">UPDATE REQUIRED</div>
+          <p className="overdue-copy">
+            These scheduled match times have passed in Fremont. Update each
+            match as completed with a result, or cancel it with a reason.
+          </p>
 
-          <small>
-            {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
-            <b>Scheduled</b>
-          </small>
+          <div className="grid">
+            {overdue.map(m => (
+              <article className="card overdue-card" key={m.id}>
+                <div className="overdue-badge">UPDATE REQUIRED</div>
 
-          <h3>{m.matchup}</h3>
-          <p>{m.court}</p>
+                <small>
+                  {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
+                  <b>Scheduled</b>
+                </small>
 
-          <button onClick={() => begin(m)}>
-            Update match details
-          </button>
-        </article>
-      ))}
-    </div>
-  </section>
-)}
+                <Matchup match={m} group={group} />
+                <p>{m.court}</p>
+
+                <button onClick={() => begin(m)}>
+                  Update match details
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <Section
         title="Upcoming matches"
         list={upcoming}
         edit={begin}
         empty="No upcoming matches."
+        group={group}
       />
 
       <Section
@@ -505,6 +533,7 @@ const next = upcoming[0];
         list={completed}
         edit={begin}
         empty="No completed matches."
+        group={group}
       />
 
       <Section
@@ -512,6 +541,7 @@ const next = upcoming[0];
         list={cancelled}
         edit={begin}
         empty="No cancelled matches."
+        group={group}
       />
 
       {open && (
@@ -527,10 +557,10 @@ const next = upcoming[0];
 
                 <select value={first} onChange={e => setFirst(e.target.value)}>
                   {roster
-                    .filter(x => x[0] !== second)
+                    .filter(([id]) => id !== second)
                     .map(([id]) => (
                       <option value={id} key={id}>
-                        {label(group, id)}
+                        {teamDisplay(group, id)}
                       </option>
                     ))}
                 </select>
@@ -541,10 +571,10 @@ const next = upcoming[0];
 
                 <select value={second} onChange={e => setSecond(e.target.value)}>
                   {roster
-                    .filter(x => x[0] !== first)
+                    .filter(([id]) => id !== first)
                     .map(([id]) => (
                       <option value={id} key={id}>
-                        {label(group, id)}
+                        {teamDisplay(group, id)}
                       </option>
                     ))}
                 </select>
@@ -579,7 +609,9 @@ const next = upcoming[0];
 
                 <input
                   value={draft.court}
-                  onChange={e => setDraft({ ...draft, court: e.target.value })}
+                  onChange={e =>
+                    setDraft({ ...draft, court: e.target.value })
+                  }
                 />
               </label>
 
@@ -592,8 +624,8 @@ const next = upcoming[0];
                     setDraft({ ...draft, status: e.target.value })
                   }
                 >
-                  {['Scheduled', 'Completed', 'Cancelled'].map(x => (
-                    <option key={x}>{x}</option>
+                  {['Scheduled', 'Completed', 'Cancelled'].map(status => (
+                    <option key={status}>{status}</option>
                   ))}
                 </select>
               </label>
