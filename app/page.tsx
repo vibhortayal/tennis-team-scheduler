@@ -3,31 +3,519 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type Group = 'Group A' | 'Group B';
-type Match = { id:string; matchup:string; match_date:string; match_time:string; court:string; status:string; result?:string|null; cancellation_reason?:string|null; league_group?:Group };
-type Draft = Omit<Match,'id'>;
-type Team = readonly [string,string];
-const groups:Record<Group,readonly Team[]>={
-  'Group A':[['2','Sudharssun, Kaushik'],['5','Prathmesh, Tushar'],['7','Akhil, Subrata'],['9','Chaitanya, Prashant'],['11','Niranjan, Naveen'],['12','Dipen, Raja']],
-  'Group B':[['1','Dipesh, Vipin'],['3','Gaurav, Anish'],['4','Amit, Ananth'],['6','Nissarg, Aniket'],['8','Manikumar, Arindam'],['10','Vibhor, Gourav'],['13','Manoj, Srinivas']],
+type Match = {
+  id: string;
+  matchup: string;
+  match_date: string;
+  match_time: string;
+  court: string;
+  status: string;
+  result?: string | null;
+  cancellation_reason?: string | null;
+  league_group?: Group;
 };
-const standings=[['9','Chaitanya / Prashant',1,4,2,'+7'],['11','Niranjan / Naveen',1,4,0,'−7'],['2','Sudharssun / Kaushik',0,5,0,'0'],['5','Prathmesh / Tushar',0,5,0,'0'],['7','Akhil / Subrata',0,5,0,'0'],['12','Dipen / Raja',0,5,0,'0']];
-const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||'';
-const api=process.env.NEXT_PUBLIC_SUPABASE_URL?`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dashboard_matches`:'';
-const headers={'Content-Type':'application/json',apikey:key,Authorization:`Bearer ${key}`,Prefer:'return=representation'};
-const label=(g:Group,id:string)=>{const t=groups[g].find(x=>x[0]===id);return t?`Team #${t[0]} — ${t[1]}`:`Team #${id}`};
-const blank=(g:Group):Draft=>({matchup:'',match_date:'',match_time:'10:00',court:'Court 2',status:'Scheduled',result:'',cancellation_reason:'',league_group:g});
-const dateText=(d:string)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric'}).format(new Date(`${d}T12:00:00`));
-const teamIds=(m:Match,g:Group)=>groups[g].filter(([id])=>m.matchup.includes(`Team #${id}`)).map(([id])=>id);
-function Section({title,list,edit,empty}:{title:string;list:Match[];edit:(m:Match)=>void;empty:string}){return <section><h2>{title}</h2>{list.length?<div className="grid">{list.map(m=><article className="card" key={m.id}><small>{dateText(m.match_date)} · {m.match_time.slice(0,5)} · <b>{m.status}</b></small><h3>{m.matchup}</h3><p>{m.court}</p>{m.result&&<p><b>{m.result}</b></p>}{m.cancellation_reason&&<p>Reason: {m.cancellation_reason}</p>}<button onClick={()=>edit(m)}>Update match</button></article>)}</div>:<p className="empty">{empty}</p>}</section>}
-export default function Page(){
- const [group,setGroup]=useState<Group>('Group B'),[matches,setMatches]=useState<Match[]>([]),[filter,setFilter]=useState('All'),[team,setTeam]=useState(''),[first,setFirst]=useState(''),[second,setSecond]=useState(''),[draft,setDraft]=useState<Draft>(blank('Group B')),[editing,setEditing]=useState<Match|null>(null),[open,setOpen]=useState(false),[note,setNote]=useState('');
- const roster=groups[group];
- const load=async()=>{if(!api||!key){setNote('Missing Supabase public environment settings.');return}const r=await fetch(`${api}?select=*&order=match_date.asc,match_time.asc`,{headers});if(r.ok)setMatches(await r.json());else setNote('Could not load matches.');};
- useEffect(()=>{load()},[]);
- useEffect(()=>{setTeam('');setFirst(groups[group][0][0]);setSecond(groups[group][1][0]);setDraft(blank(group));},[group]);
- const scoped=useMemo(()=>matches.filter(m=>(m.league_group||'Group B')===group&&(filter==='All'||m.status===filter)&&(!team||teamIds(m,group).includes(team))),[matches,group,filter,team]);
- const upcoming=scoped.filter(m=>['Scheduled','Pending'].includes(m.status)&&new Date(`${m.match_date}T23:59:59`)>=new Date()); const completed=scoped.filter(m=>m.status==='Completed'); const cancelled=scoped.filter(m=>m.status==='Cancelled'); const next=upcoming[0];
- const begin=(m?:Match)=>{setEditing(m||null);if(m){setDraft({...m,league_group:group});const ids=teamIds(m,group);setFirst(ids[0]||roster[0][0]);setSecond(ids[1]||roster[1][0])}else setDraft(blank(group));setOpen(true);setNote('')};
- const save=async(e:FormEvent)=>{e.preventDefault();if(first===second)return setNote('Choose a different opponent.');if(!draft.match_date||!draft.match_time||!draft.court)return setNote('Add a date, time, and court.');if(draft.status==='Completed'&&!draft.result?.trim())return setNote('Enter a result before completing the match.');if(draft.status==='Cancelled'&&!draft.cancellation_reason?.trim())return setNote('Enter a cancellation reason.');const conflict=matches.find(m=>m.id!==editing?.id&&(m.league_group||'Group B')===group&&m.match_date===draft.match_date&&m.status!=='Cancelled'&&teamIds(m,group).some(id=>id===first||id===second));if(conflict)return setNote('One of these teams already has an active match on that date.');const body={...draft,league_group:group,matchup:`${label(group,first)} vs ${label(group,second)}`};const r=await fetch(editing?`${api}?id=eq.${editing.id}`:api,{method:editing?'PATCH':'POST',headers,body:JSON.stringify(body)});if(!r.ok)return setNote('Could not save the match.');setOpen(false);setNote('Match saved successfully.');load()};
- return <main><style>{`*{box-sizing:border-box}body{margin:0;background:#f5f6f1;font-family:Arial;color:#15231a}main{max-width:1100px;margin:auto;padding:24px}button,select,input,textarea{font:inherit}button{border:0;border-radius:9px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}.top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}.top{padding:18px;display:flex;justify-content:space-between;align-items:center}.tabs{display:flex;padding:5px;margin:18px 0;gap:5px}.tabs button{flex:1;background:transparent;color:#57705e}.tabs button.active{background:#147a42;color:#fff}.hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef)}.eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}.badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.filters button{background:#eaf4eb;color:#17663d}.filters button.active{background:#17231d;color:#fff}select,input,textarea{padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:white}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.card{padding:16px}.card h3{margin:10px 0}.card p{color:#5f7064}.empty,.notice{background:#fff;padding:16px;border-radius:12px;color:#5f7064}.notice{color:#17663d}.modal{position:fixed;inset:0;background:#10201588;display:grid;place-items:center;padding:15px}.modal form{padding:22px;width:min(620px,100%);max-height:90vh;overflow:auto}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:5px;font-size:13px;font-weight:bold}.wide{grid-column:1/-1}.actions{margin-top:16px;display:flex;justify-content:flex-end;gap:8px}@media(max-width:650px){main{padding:14px}.grid,.fields{grid-template-columns:1fr}.wide{grid-column:auto}.hero{display:block}.badge{display:inline-block;margin-top:12px}}`}</style><header className="top"><div><b>🎾 Tennis League</b><div>Group-stage match dashboard</div></div><button onClick={()=>begin()}>Schedule match</button></header><div className="tabs">{(['Group A','Group B'] as Group[]).map(g=><button className={group===g?'active':''} onClick={()=>setGroup(g)} key={g}>{g} · {groups[g].length} teams</button>)}</div>{note&&<p className="notice">{note}</p>}{next?<section className="hero"><div><div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div><h1>{next.matchup}</h1><p>{dateText(next.match_date)} · {next.match_time.slice(0,5)} · {next.court}</p><button onClick={()=>begin(next)}>Update match</button></div><div className="badge">UPCOMING</div></section>:<section className="hero"><div><div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div><h1>No upcoming matches scheduled.</h1><p>Schedule the next match to get started.</p></div><button onClick={()=>begin()}>Schedule match</button></section>}<div className="filters">{['All','Scheduled','Pending','Completed','Cancelled'].map(x=><button className={filter===x?'active':''} onClick={()=>setFilter(x)} key={x}>{x}</button>)}<select value={team} onChange={e=>setTeam(e.target.value)}><option value="">All {group} teams</option>{roster.map(([id])=><option value={id} key={id}>{label(group,id)}</option>)}</select></div>{group==='Group A'&&<section><h2>Group A standings</h2><div className="grid">{standings.map(([id,players,played,remaining,points,rate])=><article className="card" key={id}><b>Team #{id}</b><p>{players}</p><small>{played} played · {remaining} remaining · {points} points · {rate} net rate</small></article>)}</div></section>}<Section title="Upcoming matches" list={upcoming} edit={begin} empty="No upcoming matches."/><Section title="Recent results" list={completed} edit={begin} empty="No completed matches."/><Section title="Cancelled matches" list={cancelled} edit={begin} empty="No cancelled matches."/>{open&&<div className="modal"><form onSubmit={save}><h2>{editing?'Update':'Schedule'} {group} match</h2><div className="fields"><label className="field">First team<select value={first} onChange={e=>setFirst(e.target.value)}>{roster.filter(x=>x[0]!==second).map(([id])=><option value={id} key={id}>{label(group,id)}</option>)}</select></label><label className="field">Opponent<select value={second} onChange={e=>setSecond(e.target.value)}>{roster.filter(x=>x[0]!==first).map(([id])=><option value={id} key={id}>{label(group,id)}</option>)}</select></label><label className="field">Date<input type="date" value={draft.match_date} onChange={e=>setDraft({...draft,match_date:e.target.value})}/></label><label className="field">Time<input type="time" value={draft.match_time} onChange={e=>setDraft({...draft,match_time:e.target.value})}/></label><label className="field">Court<input value={draft.court} onChange={e=>setDraft({...draft,court:e.target.value})}/></label><label className="field">Status<select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value})}>{['Pending','Scheduled','Completed','Cancelled'].map(x=><option key={x}>{x}</option>)}</select></label>{draft.status==='Completed'&&<label className="field wide">Result<textarea value={draft.result||''} onChange={e=>setDraft({...draft,result:e.target.value})}/></label>}{draft.status==='Cancelled'&&<label className="field wide">Cancellation reason<textarea value={draft.cancellation_reason||''} onChange={e=>setDraft({...draft,cancellation_reason:e.target.value})}/></label>}</div><div className="actions"><button type="button" onClick={()=>setOpen(false)}>Cancel</button><button>Save match</button></div></form></div>}</main>;
+type Draft = Omit<Match, 'id'>;
+type Team = readonly [string, string];
+
+const groups: Record<Group, readonly Team[]> = {
+  'Group A': [
+    ['2', 'Sudharssun, Kaushik'],
+    ['5', 'Prathmesh, Tushar'],
+    ['7', 'Akhil, Subrata'],
+    ['9', 'Chaitanya, Prashant'],
+    ['11', 'Niranjan, Naveen'],
+    ['12', 'Dipen, Raja'],
+  ],
+  'Group B': [
+    ['1', 'Dipesh, Vipin'],
+    ['3', 'Gaurav, Anish'],
+    ['4', 'Amit, Ananth'],
+    ['6', 'Nissarg, Aniket'],
+    ['8', 'Manikumar, Arindam'],
+    ['10', 'Vibhor, Gourav'],
+    ['13', 'Manoj, Srinivas'],
+  ],
+};
+
+const key =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+
+const api = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dashboard_matches`
+  : '';
+
+const headers = {
+  'Content-Type': 'application/json',
+  apikey: key,
+  Authorization: `Bearer ${key}`,
+  Prefer: 'return=representation',
+};
+
+const label = (g: Group, id: string) => {
+  const t = groups[g].find(x => x[0] === id);
+  return t ? `Team #${t[0]} — ${t[1]}` : `Team #${id}`;
+};
+
+const blank = (g: Group): Draft => ({
+  matchup: '',
+  match_date: '',
+  match_time: '10:00',
+  court: 'Court 2',
+  status: 'Scheduled',
+  result: '',
+  cancellation_reason: '',
+  league_group: g,
+});
+
+const dateText = (d: string) =>
+  new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(`${d}T12:00:00`));
+
+const teamIds = (m: Match, g: Group) =>
+  groups[g]
+    .filter(([id]) => m.matchup.includes(`Team #${id}`))
+    .map(([id]) => id);
+
+function Section({
+  title,
+  list,
+  edit,
+  empty,
+}: {
+  title: string;
+  list: Match[];
+  edit: (m: Match) => void;
+  empty: string;
+}) {
+  return (
+    <section>
+      <h2>{title}</h2>
+
+      {list.length ? (
+        <div className="grid">
+          {list.map(m => (
+            <article className="card" key={m.id}>
+              <small>
+                {dateText(m.match_date)} · {m.match_time.slice(0, 5)} ·{' '}
+                <b>{m.status}</b>
+              </small>
+
+              <h3>{m.matchup}</h3>
+              <p>{m.court}</p>
+
+              {m.result && (
+                <p>
+                  <b>{m.result}</b>
+                </p>
+              )}
+
+              {m.cancellation_reason && (
+                <p>Reason: {m.cancellation_reason}</p>
+              )}
+
+              <button onClick={() => edit(m)}>Update match</button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty">{empty}</p>
+      )}
+    </section>
+  );
+}
+
+export default function Page() {
+  const [group, setGroup] = useState<Group>('Group B');
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [filter, setFilter] = useState('All');
+  const [team, setTeam] = useState('');
+  const [first, setFirst] = useState('');
+  const [second, setSecond] = useState('');
+  const [draft, setDraft] = useState<Draft>(blank('Group B'));
+  const [editing, setEditing] = useState<Match | null>(null);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+
+  const roster = groups[group];
+
+  const load = async () => {
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
+
+    const r = await fetch(
+      `${api}?select=*&order=match_date.asc,match_time.asc`,
+      { headers }
+    );
+
+    if (r.ok) {
+      setMatches(await r.json());
+    } else {
+      setNote('Could not load matches.');
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    setTeam('');
+    setFirst(groups[group][0][0]);
+    setSecond(groups[group][1][0]);
+    setDraft(blank(group));
+  }, [group]);
+
+  const scoped = useMemo(
+    () =>
+      matches.filter(
+        m =>
+          (m.league_group || 'Group B') === group &&
+          (filter === 'All' || m.status === filter) &&
+          (!team || teamIds(m, group).includes(team))
+      ),
+    [matches, group, filter, team]
+  );
+
+  const upcoming = scoped.filter(
+    m =>
+      ['Scheduled', 'Pending'].includes(m.status) &&
+      new Date(`${m.match_date}T23:59:59`) >= new Date()
+  );
+
+  const completed = scoped.filter(m => m.status === 'Completed');
+  const cancelled = scoped.filter(m => m.status === 'Cancelled');
+  const next = upcoming[0];
+
+  const begin = (m?: Match) => {
+    setEditing(m || null);
+
+    if (m) {
+      setDraft({ ...m, league_group: group });
+      const ids = teamIds(m, group);
+      setFirst(ids[0] || roster[0][0]);
+      setSecond(ids[1] || roster[1][0]);
+    } else {
+      setDraft(blank(group));
+    }
+
+    setOpen(true);
+    setNote('');
+  };
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (first === second) {
+      setNote('Choose a different opponent.');
+      return;
+    }
+
+    if (!draft.match_date || !draft.match_time || !draft.court) {
+      setNote('Add a date, time, and court.');
+      return;
+    }
+
+    if (draft.status === 'Completed' && !draft.result?.trim()) {
+      setNote('Enter a result before completing the match.');
+      return;
+    }
+
+    if (
+      draft.status === 'Cancelled' &&
+      !draft.cancellation_reason?.trim()
+    ) {
+      setNote('Enter a cancellation reason.');
+      return;
+    }
+
+    const conflict = matches.find(
+      m =>
+        m.id !== editing?.id &&
+        (m.league_group || 'Group B') === group &&
+        m.match_date === draft.match_date &&
+        m.status !== 'Cancelled' &&
+        teamIds(m, group).some(id => id === first || id === second)
+    );
+
+    if (conflict) {
+      setNote('One of these teams already has an active match on that date.');
+      return;
+    }
+
+    const body = {
+      ...draft,
+      league_group: group,
+      matchup: `${label(group, first)} vs ${label(group, second)}`,
+    };
+
+    const r = await fetch(
+      editing ? `${api}?id=eq.${editing.id}` : api,
+      {
+        method: editing ? 'PATCH' : 'POST',
+        headers,
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!r.ok) {
+      setNote('Could not save the match.');
+      return;
+    }
+
+    setOpen(false);
+    setNote('Match saved successfully.');
+    load();
+  };
+
+  return (
+    <main>
+      <style>{`
+        *{box-sizing:border-box}
+        body{margin:0;background:#f5f6f1;font-family:Arial;color:#15231a}
+        main{max-width:1100px;margin:auto;padding:24px}
+        button,select,input,textarea{font:inherit}
+        button{border:0;border-radius:9px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
+        .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
+        .top{padding:18px;display:flex;justify-content:space-between;align-items:center}
+        .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
+        .tabs button{flex:1;background:transparent;color:#57705e}
+        .tabs button.active{background:#147a42;color:#fff}
+        .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef)}
+        .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
+        .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
+        .filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
+        .filters button{background:#eaf4eb;color:#17663d}
+        .filters button.active{background:#17231d;color:#fff}
+        select,input,textarea{padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:white}
+        .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+        .card{padding:16px}
+        .card h3{margin:10px 0}
+        .card p{color:#5f7064}
+        .empty,.notice{background:#fff;padding:16px;border-radius:12px;color:#5f7064}
+        .notice{color:#17663d}
+        .modal{position:fixed;inset:0;background:#10201588;display:grid;place-items:center;padding:15px}
+        .modal form{padding:22px;width:min(620px,100%);max-height:90vh;overflow:auto}
+        .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
+        .wide{grid-column:1/-1}
+        .actions{margin-top:16px;display:flex;justify-content:flex-end;gap:8px}
+        @media(max-width:650px){
+          main{padding:14px}
+          .grid,.fields{grid-template-columns:1fr}
+          .wide{grid-column:auto}
+          .hero{display:block}
+          .badge{display:inline-block;margin-top:12px}
+        }
+      `}</style>
+
+      <header className="top">
+        <div>
+          <b>🎾 Tennis League</b>
+          <div>Group-stage match dashboard</div>
+        </div>
+        <button onClick={() => begin()}>Schedule match</button>
+      </header>
+
+      <div className="tabs">
+        {(['Group A', 'Group B'] as Group[]).map(g => (
+          <button
+            className={group === g ? 'active' : ''}
+            onClick={() => setGroup(g)}
+            key={g}
+          >
+            {g} · {groups[g].length} teams
+          </button>
+        ))}
+      </div>
+
+      {note && <p className="notice">{note}</p>}
+
+      {next ? (
+        <section className="hero">
+          <div>
+            <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
+            <h1>{next.matchup}</h1>
+            <p>
+              {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
+              {next.court}
+            </p>
+            <button onClick={() => begin(next)}>Update match</button>
+          </div>
+          <div className="badge">UPCOMING</div>
+        </section>
+      ) : (
+        <section className="hero">
+          <div>
+            <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
+            <h1>No upcoming matches scheduled.</h1>
+            <p>Schedule the next match to get started.</p>
+          </div>
+          <button onClick={() => begin()}>Schedule match</button>
+        </section>
+      )}
+
+      <div className="filters">
+        {['All', 'Scheduled', 'Pending', 'Completed', 'Cancelled'].map(x => (
+          <button
+            className={filter === x ? 'active' : ''}
+            onClick={() => setFilter(x)}
+            key={x}
+          >
+            {x}
+          </button>
+        ))}
+
+        <select value={team} onChange={e => setTeam(e.target.value)}>
+          <option value="">All {group} teams</option>
+          {roster.map(([id]) => (
+            <option value={id} key={id}>
+              {label(group, id)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <Section
+        title="Upcoming matches"
+        list={upcoming}
+        edit={begin}
+        empty="No upcoming matches."
+      />
+
+      <Section
+        title="Recent results"
+        list={completed}
+        edit={begin}
+        empty="No completed matches."
+      />
+
+      <Section
+        title="Cancelled matches"
+        list={cancelled}
+        edit={begin}
+        empty="No cancelled matches."
+      />
+
+      {open && (
+        <div className="modal">
+          <form onSubmit={save}>
+            <h2>
+              {editing ? 'Update' : 'Schedule'} {group} match
+            </h2>
+
+            <div className="fields">
+              <label className="field">
+                First team
+                <select value={first} onChange={e => setFirst(e.target.value)}>
+                  {roster
+                    .filter(x => x[0] !== second)
+                    .map(([id]) => (
+                      <option value={id} key={id}>
+                        {label(group, id)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+
+              <label className="field">
+                Opponent
+                <select value={second} onChange={e => setSecond(e.target.value)}>
+                  {roster
+                    .filter(x => x[0] !== first)
+                    .map(([id]) => (
+                      <option value={id} key={id}>
+                        {label(group, id)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+
+              <label className="field">
+                Date
+                <input
+                  type="date"
+                  value={draft.match_date}
+                  onChange={e =>
+                    setDraft({ ...draft, match_date: e.target.value })
+                  }
+                />
+              </label>
+
+              <label className="field">
+                Time
+                <input
+                  type="time"
+                  value={draft.match_time}
+                  onChange={e =>
+                    setDraft({ ...draft, match_time: e.target.value })
+                  }
+                />
+              </label>
+
+              <label className="field">
+                Court
+                <input
+                  value={draft.court}
+                  onChange={e => setDraft({ ...draft, court: e.target.value })}
+                />
+              </label>
+
+              <label className="field">
+                Status
+                <select
+                  value={draft.status}
+                  onChange={e => setDraft({ ...draft, status: e.target.value })}
+                >
+                  {['Pending', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </label>
+
+              {draft.status === 'Completed' && (
+                <label className="field wide">
+                  Result
+                  <textarea
+                    value={draft.result || ''}
+                    onChange={e =>
+                      setDraft({ ...draft, result: e.target.value })
+                    }
+                  />
+                </label>
+              )}
+
+              {draft.status === 'Cancelled' && (
+                <label className="field wide">
+                  Cancellation reason
+                  <textarea
+                    value={draft.cancellation_reason || ''}
+                    onChange={e =>
+                      setDraft({
+                        ...draft,
+                        cancellation_reason: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="actions">
+              <button type="button" onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+              <button>Save match</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </main>
+  );
 }
