@@ -1,5 +1,4 @@
-import { FormEvent, useState } from 'react';
-import { Group, Team, allPlayers, identityValue, teamDisplay } from '../teams';
+import { FormEvent } from 'react';import { Group, Team, allPlayers, identityValue, teamDisplay } from '../teams';
 import { Draft } from '../lib/matches';
 
 const sortedPlayers = [...allPlayers].sort((a, b) => a.name.localeCompare(b.name));
