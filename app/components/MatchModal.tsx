@@ -27,7 +27,7 @@ export function IdentityPrompt({
           Player
           <select value={value} onChange={event => onValue(event.target.value)}>
             <option value="">Select a player</option>
-            sortedPlayers.map(player => (
+            {sortedPlayers.map(player => (
               <option key={identityValue(player)} value={identityValue(player)}>
                 {player.name}
               </option>
