@@ -19,6 +19,12 @@ type Match = {
 
 type Draft = Omit<Match, 'id'>;
 type Team = readonly [string, string];
+type Identity = {
+  name: string;
+  teamId: string;
+  group: Group;
+  viewing?: boolean;
+};
 
 type Suggestion = {
   opponentId: string;
@@ -47,6 +53,31 @@ const groups: Record<Group, readonly Team[]> = {
     ['13', 'Manoj, Srinivas'],
   ],
 };
+
+const IDENTITY_KEY = 'ito-who-am-i';
+
+const allPlayers: Identity[] = (['Group A', 'Group B'] as Group[]).flatMap(
+  group =>
+    groups[group].flatMap(([teamId, names]) =>
+      names.split(',').map(name => ({
+        name: name.trim(),
+        teamId,
+        group,
+      }))
+    )
+);
+
+const viewingIdentity: Identity = {
+  name: 'Viewing only',
+  teamId: '',
+  group: 'Group B',
+  viewing: true,
+};
+
+const identityValue = (identity: Identity) =>
+  identity.viewing
+    ? 'viewing'
+    : `${identity.group}:${identity.teamId}:${identity.name}`;
 
 const key =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
@@ -383,6 +414,7 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionNote, setSuggestionNote] = useState('');
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
+  const [identity, setIdentity] = useState<Identity>(viewingIdentity);
 
   const roster = groups[group];
   const scheduleRoster = groups[scheduleGroup];
@@ -410,6 +442,43 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(IDENTITY_KEY);
+
+      if (!saved) {
+        return;
+      }
+
+      const parsed = JSON.parse(saved) as Identity;
+      const savedIdentity = parsed.viewing
+        ? viewingIdentity
+        : allPlayers.find(
+            player =>
+              player.name === parsed.name &&
+              player.teamId === parsed.teamId &&
+              player.group === parsed.group
+          );
+
+      if (savedIdentity) {
+        setIdentity(savedIdentity);
+      }
+    } catch {
+      setIdentity(viewingIdentity);
+    }
+  }, []);
+
+  const chooseIdentity = (nextIdentity: Identity) => {
+    setIdentity(nextIdentity);
+    window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+
+    if (!nextIdentity.viewing) {
+      setGroup(nextIdentity.group);
+      setScheduleGroup(nextIdentity.group);
+      setSuggestionTeam(nextIdentity.teamId);
+    }
+  };
+
+  useEffect(() => {
     setTeam('');
 
     if (!open) {
@@ -417,7 +486,7 @@ export default function Page() {
       setSecond(groups[group][1][0]);
       setDraft(blank(group));
     }
-  }, [group]);
+  }, [group, open]);
 
   useEffect(() => {
     setSuggestionTeam('');
@@ -664,7 +733,8 @@ export default function Page() {
         button,select,input,textarea{font:inherit}
         button{border:0;border-radius:9px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
         .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
-        .top{padding:18px;display:flex;justify-content:space-between;align-items:center}
+        .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+        .identity-select{width:auto;min-width:190px;max-width:260px;background:#eaf4eb;color:#17663d;font-weight:700}
         .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
         .tabs button{flex:1;background:transparent;color:#57705e}
         .tabs button.active{background:#147a42;color:#fff}
@@ -721,6 +791,8 @@ export default function Page() {
         .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
         @media(max-width:650px){
           main{padding:14px}
+          .top{align-items:flex-start}
+          .identity-select{min-width:0;max-width:180px}
           .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
           .wide{grid-column:auto}
           .hero{display:block}
@@ -732,6 +804,33 @@ export default function Page() {
         <div>
           <b>🎾 Innovation Tennis Open</b>
         </div>
+
+        <select
+          className="identity-select"
+          aria-label="Who are you?"
+          value={identityValue(identity)}
+          onChange={event => {
+            const value = event.target.value;
+
+            if (value === 'viewing') {
+              chooseIdentity(viewingIdentity);
+              return;
+            }
+
+            const selected = allPlayers.find(player => identityValue(player) === value);
+
+            if (selected) {
+              chooseIdentity(selected);
+            }
+          }}
+        >
+          <option value="viewing">Who are you? · Viewing only</option>
+          {allPlayers.map(player => (
+            <option key={identityValue(player)} value={identityValue(player)}>
+              {player.name} · {player.group} · #{player.teamId}
+            </option>
+          ))}
+        </select>
       </header>
 
       <div className="tabs">
@@ -741,7 +840,6 @@ export default function Page() {
         >
           Match Dashboard
         </button>
-
         <button
           className={view === 'scheduling' ? 'active' : ''}
           onClick={() => setView('scheduling')}
