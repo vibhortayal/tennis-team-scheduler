@@ -2,6 +2,8 @@ import { FormEvent, useState } from 'react';
 import { Group, Team, allPlayers, identityValue, teamDisplay } from '../teams';
 import { Draft } from '../lib/matches';
 
+const sortedPlayers = [...allPlayers].sort((a, b) => a.name.localeCompare(b.name));
+
 export function IdentityPrompt({
   value,
   onValue,
@@ -25,9 +27,9 @@ export function IdentityPrompt({
           Player
           <select value={value} onChange={event => onValue(event.target.value)}>
             <option value="">Select a player</option>
-            {allPlayers.map(player => (
+            sortedPlayers.map(player => (
               <option key={identityValue(player)} value={identityValue(player)}>
-                {player.name} · {player.group} · #{player.teamId}
+                {player.name}
               </option>
             ))}
           </select>
