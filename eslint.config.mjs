@@ -7,6 +7,12 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   prettier,
+  {
+    rules: {
+      // Initialization-style setState calls inside useEffect are intentional here.
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
 ];
 
 export default eslintConfig;
