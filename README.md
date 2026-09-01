@@ -31,3 +31,8 @@ For a date/time change, expire or cancel the old proposal and create a new propo
 - Add an Edge Function or cron job to deliver pending-response reminders.
 - Add an email provider and optional SMS opt-in; store notification delivery status.
 - Add a service-role-only admin interface for fixtures, rosters, courts, and results.
+
+
+## Code style
+
+Formatting is enforced with Prettier and ESLint. A Husky pre-commit hook runs lint-staged to auto-fix staged files, CI checks format/lint/build, and the autofix bot formats pull requests automatically.
