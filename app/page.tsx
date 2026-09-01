@@ -235,35 +235,43 @@ setNote('Match saved successfully.');
 load();
 };
 return (
-<main>
+<main className="app-shell">
 <Styles />
 
 <header className="top">
-<div><b>🎾 Innovation Tennis Open</b></div>
+<div className="brand">
+<span className="brand-mark" aria-hidden="true">{'\ud83c\udfbe'}</span>
+<div className="brand-text">
+<span className="brand-name">Innovation Tennis Open</span>
+<span className="brand-tagline">Match scheduling, simplified</span>
+</div>
+</div>
 <PlayerPicker identity={identity} onChange={chooseIdentity} />
 </header>
 
-<div className="tabs">
-<button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Match Dashboard</button>
-<button className={view === 'scheduling' ? 'active' : ''} onClick={() => setView('scheduling')}>Smart Scheduling</button>
+<div className="tabs segmented" role="tablist">
+<button type="button" role="tab" aria-selected={view === 'dashboard'} className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Dashboard</button>
+<button type="button" role="tab" aria-selected={view === 'scheduling'} className={view === 'scheduling' ? 'active' : ''} onClick={() => setView('scheduling')}>Smart Scheduling</button>
 </div>
 
-{note && <p className="notice">{note}</p>}
+{note && <p className="notice" role="status">{note}</p>}
 
 {view === 'dashboard' ? (
 <>
 {nextMatches.length > 0 ? (
-<section className="hero next-matches">
+<section className="hero next-matches" aria-label="Next match">
 <div className="wide-hero">
-<div className="eyebrow">NEXT MATCH · {dateText(nextMatchDate)}</div>
+<div className="eyebrow">Next match {'\u00b7'} {dateText(nextMatchDate)}</div>
 <div className="grid">
 {nextMatches.map(m => {
 const matchGroup = (m.league_group || 'Group B') as Group;
 return (
-<article className="card" key={m.id}>
-<small>{matchGroup.toUpperCase()} · {m.match_time.slice(0, 5)}</small>
+<article className="match-card hero-card" key={m.id}>
+<div className="match-card-head">
+<span className="match-meta">{matchGroup} {'\u00b7'} {m.match_time.slice(0, 5)}</span>
+<span className="court-tag">{m.court}</span>
+</div>
 <Matchup match={m} group={matchGroup} />
-<p>{m.court}</p>
 </article>
 );
 })}
@@ -271,29 +279,29 @@ return (
 </div>
 </section>
 ) : (
-<section className="hero">
+<section className="hero empty-hero" aria-label="Next match">
 <div>
-<div className="eyebrow">NEXT MATCH</div>
-<h1>No upcoming matches scheduled.</h1>
-<p>Schedule the next match to get started.</p>
+<div className="eyebrow">Next match</div>
+<h1>No matches on the calendar yet</h1>
+<p>Schedule your next match to kick off the season.</p>
 </div>
-<div className="badge">UPCOMING</div>
+<button type="button" className="btn btn-primary" onClick={startScheduling}>Schedule a match</button>
 </section>
 )}
 
-<div className="tabs">
+<div className="tabs segmented group-tabs">
 {(['Group A', 'Group B'] as Group[]).map(g => (
-<button className={group === g ? 'active' : ''} onClick={() => setGroup(g)} key={g}>{g} · {groups[g].length} teams</button>
+<button type="button" className={group === g ? 'active' : ''} onClick={() => setGroup(g)} key={g}>{g} {'\u00b7'} {groups[g].length} teams</button>
 ))}
 </div>
 
-<button className="group-schedule" onClick={startScheduling}>Schedule match</button>
+<button type="button" className="btn btn-primary btn-block group-schedule" onClick={startScheduling}>Schedule a match</button>
 
 <div className="filters">
 {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
-<button className={filter === x ? 'active' : ''} onClick={() => setFilter(x)} key={x}>{x}</button>
+<button type="button" className={filter === x ? 'active' : ''} onClick={() => setFilter(x)} key={x}>{x}</button>
 ))}
-<select value={team} onChange={e => setTeam(e.target.value)}>
+<select value={team} onChange={e => setTeam(e.target.value)} aria-label="Filter by team">
 <option value="">All {group} teams</option>
 {roster.map(([id]) => (
 <option value={id} key={id}>{teamDisplay(group, id)}</option>
@@ -302,16 +310,20 @@ return (
 </div>
 {overdue.length > 0 && (
 <section className="overdue-section">
-<h2 className="overdue-heading">Action required — {overdue.length} past match{overdue.length === 1 ? '' : 'es'}</h2>
-<p className="overdue-copy">These scheduled match times have passed in Fremont. Update each match as completed with a result, or cancel it with a reason.</p>
+<h2 className="overdue-heading">Action required {'\u2014'} {overdue.length} past match{overdue.length === 1 ? '' : 'es'}</h2>
+<p className="overdue-copy">These scheduled match times have passed in Fremont. Mark each match completed with a result, or cancel it with a reason.</p>
 <div className="grid">
 {overdue.map(m => (
-<article className="card overdue-card" key={m.id}>
-<div className="overdue-badge">UPDATE REQUIRED</div>
-<small>{dateText(m.match_date)} · {m.match_time.slice(0, 5)} · <b>Scheduled</b></small>
+<article className="match-card overdue-card status-overdue" key={m.id}>
+<div className="match-card-head">
+<span className="status-pill status-pill-overdue">Update required</span>
+<span className="match-meta">{dateText(m.match_date)} {'\u00b7'} {m.match_time.slice(0, 5)}</span>
+</div>
 <Matchup match={m} group={group} />
-<p>{m.court}</p>
-<button onClick={() => begin(m)}>Update match details</button>
+<div className="match-card-foot">
+<span className="court-tag">{m.court}</span>
+</div>
+<button type="button" className="btn btn-primary card-action" onClick={() => begin(m)}>Update match details</button>
 </article>
 ))}
 </div>
