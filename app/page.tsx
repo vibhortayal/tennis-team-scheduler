@@ -207,6 +207,10 @@ export default function Page() {
     match => match.match_date === nextMatchDate,
   );
 
+  /**
+   * UI-only eligibility check. It intentionally uses the match's own
+   * persisted group, not the currently selected dashboard group.
+   */
   const canUpdateMatch = (match: Match) => {
     const matchGroup = (match.league_group || 'Group B') as Group;
 
@@ -228,12 +232,14 @@ export default function Page() {
     if (match) {
       const matchGroup = (match.league_group || 'Group B') as Group;
       const matchRoster = groups[matchGroup];
-
-      setGroup(matchGroup);
-      setDraft({ ...match, league_group: matchGroup });
-
       const ids = teamIds(match, matchGroup);
 
+      /**
+       * Do not call setGroup(matchGroup) here. The dashboard already scopes
+       * displayed matches by `group`, and changing the dashboard filter while
+       * opening an edit dialog would be an unexpected side effect.
+       */
+      setDraft({ ...match, league_group: matchGroup });
       setFirst(ids[0] || matchRoster[0][0]);
       setSecond(ids[1] || matchRoster[1][0]);
     } else {
@@ -412,6 +418,10 @@ export default function Page() {
   const save = async (event: FormEvent) => {
     event.preventDefault();
 
+    /**
+     * Defense in depth for the UI flow: a match cannot be updated after
+     * identity changes or if an edit is invoked outside the normal button.
+     */
     if (editing && !canUpdateMatch(editing)) {
       setNote('Only players on this match can update it.');
       setOpen(false);
@@ -441,13 +451,19 @@ export default function Page() {
       return;
     }
 
+    const matchGroup = editing
+      ? ((editing.league_group || 'Group B') as Group)
+      : group;
+
     const conflict = matches.find(
       match =>
         match.id !== editing?.id &&
-        (match.league_group || 'Group B') === group &&
+        (match.league_group || 'Group B') === matchGroup &&
         match.match_date === draft.match_date &&
         match.status !== 'Cancelled' &&
-        teamIds(match, group).some(id => id === first || id === second),
+        teamIds(match, matchGroup).some(
+          id => id === first || id === second,
+        ),
     );
 
     if (conflict) {
@@ -459,7 +475,7 @@ export default function Page() {
 
     const body = {
       ...draft,
-      league_group: group,
+      league_group: matchGroup,
       matchup: `Team #${first} vs Team #${second}`,
     };
 
