@@ -407,6 +407,8 @@ export default function Page() {
   const [draft, setDraft] = useState<Draft>(blank('Group B'));
   const [editing, setEditing] = useState<Match | null>(null);
   const [open, setOpen] = useState(false);
+  const [identityPromptOpen, setIdentityPromptOpen] = useState(false);
+  const [pendingIdentityValue, setPendingIdentityValue] = useState('');
   const [note, setNote] = useState('');
   const [suggestionTeam, setSuggestionTeam] = useState('');
   const [yourGapDays, setYourGapDays] = useState(3);
@@ -470,11 +472,16 @@ export default function Page() {
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
     window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+    setSuggestions([]);
+    setSuggestionNote('');
+    setSuggestionOpponent('');
 
     if (!nextIdentity.viewing) {
       setGroup(nextIdentity.group);
       setScheduleGroup(nextIdentity.group);
       setSuggestionTeam(nextIdentity.teamId);
+    } else {
+      setSuggestionTeam('');
     }
   };
 
@@ -487,13 +494,6 @@ export default function Page() {
       setDraft(blank(group));
     }
   }, [group, open]);
-
-  useEffect(() => {
-    setSuggestionTeam('');
-    setSuggestions([]);
-    setSuggestionNote('');
-    setSuggestionOpponent('');
-  }, [scheduleGroup]);
 
   const scoped = useMemo(
     () =>
@@ -524,7 +524,8 @@ export default function Page() {
         );
 
     return filtered.sort(
-      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
     );
   }, [suggestions, suggestionOpponent]);
 
@@ -547,7 +548,6 @@ export default function Page() {
     .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)));
 
   const nextMatchDate = upcomingAll[0]?.match_date || '';
-
   const nextMatches = upcomingAll.filter(m => m.match_date === nextMatchDate);
 
   const begin = (m?: Match) => {
@@ -561,15 +561,52 @@ export default function Page() {
       setSecond(ids[1] || roster[1][0]);
     } else {
       setDraft(blank(group));
+      setFirst(identity.teamId || roster[0][0]);
+      setSecond(
+        roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0][0]
+      );
     }
 
     setOpen(true);
     setNote('');
   };
 
+  const startScheduling = () => {
+    if (identity.viewing) {
+      setPendingIdentityValue('');
+      setIdentityPromptOpen(true);
+      return;
+    }
+
+    begin();
+  };
+
+  const continueWithIdentity = () => {
+    const selected = allPlayers.find(
+      player => identityValue(player) === pendingIdentityValue
+    );
+
+    if (!selected) {
+      return;
+    }
+
+    chooseIdentity(selected);
+    setIdentityPromptOpen(false);
+    setPendingIdentityValue('');
+    setEditing(null);
+    setFirst(selected.teamId);
+    setSecond(
+      groups[selected.group].find(([id]) => id !== selected.teamId)?.[0] ||
+        selected.teamId
+    );
+    setDraft(blank(selected.group));
+    setOpen(true);
+    setNote('');
+  };
+
   const findSuggestions = () => {
-    if (!suggestionTeam) {
-      setSuggestionNote('Choose your team first.');
+    if (identity.viewing || !suggestionTeam) {
+      setSuggestionNote('Select who you are from the top-right menu first.');
       setSuggestions([]);
       setSuggestionOpponent('');
       return;
@@ -627,20 +664,28 @@ export default function Page() {
     }
 
     const ranked = candidates.sort(
-      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
     );
 
     setSuggestions(ranked);
     setSuggestionOpponent('');
     setSuggestionNote(
       ranked.length
-        ? `Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.`
+        ? 'Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.'
         : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
     );
   };
 
   const scheduleSuggestion = (suggestion: Suggestion) => {
-    if (existingFixture(matches, scheduleGroup, suggestionTeam, suggestion.opponentId)) {
+    if (
+      existingFixture(
+        matches,
+        scheduleGroup,
+        suggestionTeam,
+        suggestion.opponentId
+      )
+    ) {
       setSuggestionNote(
         'That matchup is already scheduled or completed, so it cannot be suggested.'
       );
@@ -732,6 +777,7 @@ export default function Page() {
         main{max-width:1100px;margin:auto;padding:24px}
         button,select,input,textarea{font:inherit}
         button{border:0;border-radius:9px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
+        button:disabled{cursor:not-allowed;opacity:.55}
         .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
         .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
         .identity-select{width:auto;min-width:190px;max-width:260px;background:#eaf4eb;color:#17663d;font-weight:700}
@@ -754,12 +800,16 @@ export default function Page() {
         .card p{color:#5f7064}
         .empty,.notice{background:#fff;padding:16px;border-radius:12px;color:#5f7064}
         .notice{color:#17663d}
-        .modal{position:fixed;inset:0;background:#10201588;display:grid;place-items:center;padding:15px}
+        .modal{position:fixed;inset:0;background:#10201588;display:grid;place-items:center;padding:15px;z-index:10}
         .modal form{padding:22px;width:min(620px,100%);max-height:90vh;overflow:auto}
+        .identity-modal{width:min(440px,100%) !important}
+        .identity-modal h2{margin-top:0}
+        .identity-modal p{color:#5f7064;line-height:1.5}
         .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
         .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
         .wide{grid-column:1/-1}
         .actions{margin-top:16px;display:flex;justify-content:flex-end;gap:8px}
+        .secondary{background:#eaf4eb;color:#17663d}
         .team-line{display:flex;align-items:center;gap:8px;min-width:0}
         .team-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:32px;height:26px;padding:0 8px;border-radius:999px;background:#eaf4eb;color:#17663d;font-size:12px;font-weight:800}
         .team-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#15231a;font-weight:750}
@@ -782,6 +832,8 @@ export default function Page() {
         .suggestion-step{margin-top:18px}
         .suggestion-step h3{margin:0 0 8px;font-size:14px}
         .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
+        .known-team{padding:12px;border:1px solid #cbdccd;border-radius:10px;background:#f1f7f1;color:#17663d;font-weight:800}
+        .known-team small{display:block;margin-bottom:4px;color:#5f7064;font-size:11px;letter-spacing:.7px}
         .suggest-button{margin-top:16px}
         .suggestion-note{margin:14px 0 0;color:#17663d !important;font-weight:700}
         .suggestion-filter{margin-top:16px;max-width:360px}
@@ -901,7 +953,7 @@ export default function Page() {
             ))}
           </div>
 
-          <button className="group-schedule" onClick={() => begin()}>
+          <button className="group-schedule" onClick={startScheduling}>
             Schedule match
           </button>
 
@@ -989,155 +1041,180 @@ export default function Page() {
             <div className="eyebrow">SMART SCHEDULING</div>
             <h2>Find a fair date and available opponent</h2>
             <p>
-              Select your group and team, then set rest-day rules for both sides.
-              Already scheduled or completed matchups are never suggested. Rest
-              days count completed matches and scheduled upcoming matches before
-              and after the suggested date. Each suggestion shows that team&apos;s
-              last match and next match.
+              Your group and team come from the player selected in the top-right
+              menu. To schedule on someone else&apos;s behalf, switch the selected
+              player there first.
             </p>
           </div>
 
-          <div className="suggestion-step">
-            <h3>Step 1 · Select your group</h3>
-            <div className="tabs">
-              {(['Group A', 'Group B'] as Group[]).map(g => (
-                <button
-                  className={scheduleGroup === g ? 'active' : ''}
-                  onClick={() => setScheduleGroup(g)}
-                  key={g}
-                  type="button"
-                >
-                  {g} · {groups[g].length} teams
-                </button>
-              ))}
+          {identity.viewing ? (
+            <div className="suggestion-step">
+              <h3>Select who you are</h3>
+              <p>
+                Choose a player from the top-right menu to use Smart Scheduling.
+              </p>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="suggestion-step">
+                <h3>Your team</h3>
+                <div className="known-team">
+                  <small>{scheduleGroup.toUpperCase()}</small>
+                  {teamDisplay(scheduleGroup, suggestionTeam)}
+                </div>
+              </div>
 
-          <div className="suggestion-step">
-            <h3>Step 2 · Select your team</h3>
-            <label className="field">
-              Your team
-              <select
-                value={suggestionTeam}
-                onChange={e => setSuggestionTeam(e.target.value)}
-              >
-                <option value="">Choose your team</option>
+              <div className="suggestion-step">
+                <h3>Set rest-day rules</h3>
+                <div className="suggestion-fields">
+                  <label className="field">
+                    Minimum days after your last match
+                    <select
+                      value={yourGapDays}
+                      onChange={e => setYourGapDays(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                        <option value={days} key={days}>
+                          {days} day{days === 1 ? '' : 's'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                {scheduleRoster.map(([id]) => (
-                  <option value={id} key={id}>
-                    {teamDisplay(scheduleGroup, id)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                  <label className="field">
+                    Minimum days after opponent&apos;s last match
+                    <select
+                      value={opponentGapDays}
+                      onChange={e => setOpponentGapDays(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                        <option value={days} key={days}>
+                          {days} day{days === 1 ? '' : 's'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
 
-          <div className="suggestion-step">
-            <h3>Step 3 · Set rest-day rules</h3>
-            <div className="suggestion-fields">
-              <label className="field">
-                Minimum days after your last match
-                <select
-                  value={yourGapDays}
-                  onChange={e => setYourGapDays(Number(e.target.value))}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
-                    <option value={days} key={days}>
-                      {days} day{days === 1 ? '' : 's'}
-                    </option>
+              <button className="suggest-button" onClick={findSuggestions}>
+                Find available matches
+              </button>
+
+              {suggestionNote && (
+                <p className="suggestion-note">{suggestionNote}</p>
+              )}
+
+              {suggestions.length > 0 && (
+                <label className="field suggestion-filter">
+                  Filter by opponent
+                  <select
+                    value={suggestionOpponent}
+                    onChange={e => setSuggestionOpponent(e.target.value)}
+                  >
+                    <option value="">All opponents</option>
+
+                    {opponentOptions.map(id => (
+                      <option value={id} key={id}>
+                        {teamDisplay(scheduleGroup, id)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {visibleSuggestions.length > 0 && (
+                <div className="grid suggestion-grid">
+                  {visibleSuggestions.map(suggestion => (
+                    <article
+                      className="card suggestion-card"
+                      key={`${suggestion.opponentId}-${suggestion.date}`}
+                    >
+                      <small>SUGGESTED MATCH</small>
+
+                      <div className="matchup">
+                        <TeamContext
+                          group={scheduleGroup}
+                          id={suggestionTeam}
+                          matches={matches}
+                        />
+                        <span className="versus">vs</span>
+                        <TeamContext
+                          group={scheduleGroup}
+                          id={suggestion.opponentId}
+                          matches={matches}
+                        />
+                      </div>
+
+                      <p>
+                        <b>{dateText(suggestion.date)}</b>
+                        <br />
+                        Suggested start: 7:00 PM
+                      </p>
+
+                      <p className="gap-text">
+                        Your rest:{' '}
+                        {suggestion.yourGap === 99
+                          ? 'No nearby match'
+                          : `${suggestion.yourGap} days`}
+                        <br />
+                        Opponent rest:{' '}
+                        {suggestion.opponentGap === 99
+                          ? 'No nearby match'
+                          : `${suggestion.opponentGap} days`}
+                      </p>
+
+                      <button onClick={() => scheduleSuggestion(suggestion)}>
+                        Schedule this match
+                      </button>
+                    </article>
                   ))}
-                </select>
-              </label>
-
-              <label className="field">
-                Minimum days after opponent&apos;s last match
-                <select
-                  value={opponentGapDays}
-                  onChange={e => setOpponentGapDays(Number(e.target.value))}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
-                    <option value={days} key={days}>
-                      {days} day{days === 1 ? '' : 's'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <button className="suggest-button" onClick={findSuggestions}>
-            Find available matches
-          </button>
-
-          {suggestionNote && <p className="suggestion-note">{suggestionNote}</p>}
-
-          {suggestions.length > 0 && (
-            <label className="field suggestion-filter">
-              Filter by opponent
-              <select
-                value={suggestionOpponent}
-                onChange={e => setSuggestionOpponent(e.target.value)}
-              >
-                <option value="">All opponents</option>
-
-                {opponentOptions.map(id => (
-                  <option value={id} key={id}>
-                    {teamDisplay(scheduleGroup, id)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {visibleSuggestions.length > 0 && (
-            <div className="grid suggestion-grid">
-              {visibleSuggestions.map(suggestion => (
-                <article
-                  className="card suggestion-card"
-                  key={`${suggestion.opponentId}-${suggestion.date}`}
-                >
-                  <small>SUGGESTED MATCH</small>
-
-                  <div className="matchup">
-                    <TeamContext
-                      group={scheduleGroup}
-                      id={suggestionTeam}
-                      matches={matches}
-                    />
-                    <span className="versus">vs</span>
-                    <TeamContext
-                      group={scheduleGroup}
-                      id={suggestion.opponentId}
-                      matches={matches}
-                    />
-                  </div>
-
-                  <p>
-                    <b>{dateText(suggestion.date)}</b>
-                    <br />
-                    Suggested start: 7:00 PM
-                  </p>
-
-                  <p className="gap-text">
-                    Your rest:{' '}
-                    {suggestion.yourGap === 99
-                      ? 'No nearby match'
-                      : `${suggestion.yourGap} days`}
-                    <br />
-                    Opponent rest:{' '}
-                    {suggestion.opponentGap === 99
-                      ? 'No nearby match'
-                      : `${suggestion.opponentGap} days`}
-                  </p>
-
-                  <button onClick={() => scheduleSuggestion(suggestion)}>
-                    Schedule this match
-                  </button>
-                </article>
-              ))}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </section>
+      )}
+
+      {identityPromptOpen && (
+        <div className="modal">
+          <div className="identity-modal" role="dialog" aria-modal="true">
+            <h2>Who are you?</h2>
+            <p>Please select who you are before scheduling a match.</p>
+
+            <label className="field">
+              Player
+              <select
+                value={pendingIdentityValue}
+                onChange={event => setPendingIdentityValue(event.target.value)}
+              >
+                <option value="">Select a player</option>
+                {allPlayers.map(player => (
+                  <option key={identityValue(player)} value={identityValue(player)}>
+                    {player.name} · {player.group} · #{player.teamId}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="actions">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setIdentityPromptOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!pendingIdentityValue}
+                onClick={continueWithIdentity}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {open && (
@@ -1245,7 +1322,11 @@ export default function Page() {
             </div>
 
             <div className="actions">
-              <button type="button" onClick={() => setOpen(false)}>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setOpen(false)}
+              >
                 Cancel
               </button>
 
