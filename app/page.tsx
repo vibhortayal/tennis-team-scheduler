@@ -216,21 +216,6 @@ const matchesForTeam = (allMatches: Match[], group: Group, teamId: string) =>
       matchIncludesTeam(match.matchup, teamId)
   );
 
-const restGapAroundDate = (teamMatches: Match[], date: string) => {
-  const previous = teamMatches
-    .filter(match => match.match_date < date)
-    .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
-
-  const next = teamMatches
-    .filter(match => match.match_date > date)
-    .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
-
-  const previousGap = previous ? daysBetween(previous.match_date, date) : 99;
-  const nextGap = next ? daysBetween(date, next.match_date) : 99;
-
-  return Math.min(previousGap, nextGap);
-};
-
 function TeamLine({ group, id }: { group: Group; id: string }) {
   return (
     <div className="team-line">
@@ -414,17 +399,26 @@ export default function Page() {
 
   const completed = scoped.filter(m => m.status === 'Completed');
   const cancelled = scoped.filter(m => m.status === 'Cancelled');
-  const next = upcoming[0];
+
+  const nextMatch = matches
+    .filter(
+      m => m.status === 'Scheduled' && matchDateTime(m) >= nowInFremont
+    )
+    .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)))[0];
+
+  const nextMatchGroup: Group = (nextMatch?.league_group || 'Group B') as Group;
 
   const begin = (m?: Match) => {
     setEditing(m || null);
 
     if (m) {
-      setDraft({ ...m, league_group: group });
+      const matchGroup = (m.league_group || group) as Group;
+      setGroup(matchGroup);
+      setDraft({ ...m, league_group: matchGroup });
 
-      const ids = teamIds(m, group);
-      setFirst(ids[0] || roster[0][0]);
-      setSecond(ids[1] || roster[1][0]);
+      const ids = teamIds(m, matchGroup);
+      setFirst(ids[0] || groups[matchGroup][0][0]);
+      setSecond(ids[1] || groups[matchGroup][1][0]);
     } else {
       setDraft(blank(group));
     }
@@ -475,8 +469,21 @@ export default function Page() {
           continue;
         }
 
-        const yourGap = restGapAroundDate(yourMatches, date);
-        const opponentGap = restGapAroundDate(opponentMatches, date);
+        const yourPrevious = yourMatches
+          .filter(match => match.match_date < date)
+          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+        const opponentPrevious = opponentMatches
+          .filter(match => match.match_date < date)
+          .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+
+        const yourGap = yourPrevious
+          ? daysBetween(yourPrevious.match_date, date)
+          : 99;
+
+        const opponentGap = opponentPrevious
+          ? daysBetween(opponentPrevious.match_date, date)
+          : 99;
 
         if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
           continue;
@@ -500,8 +507,8 @@ export default function Page() {
     setSuggestionOpponent('');
     setSuggestionNote(
       ranked.length
-        ? `Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.`
-        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
+        ? `Found suggested matches, sorted by date. Already scheduled or completed matchups are hidden.`
+        : 'No suitable matches found in the next 30 days. Already scheduled or completed matchups are never suggested.'
     );
   };
 
@@ -605,7 +612,7 @@ export default function Page() {
         .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
         .tabs button{flex:1;background:transparent;color:#57705e}
         .tabs button.active{background:#147a42;color:#fff}
-        .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef)}
+        .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef);margin:18px 0 0}
         .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
         .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
         .filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
@@ -686,6 +693,33 @@ export default function Page() {
 
       {view === 'dashboard' ? (
         <>
+          {nextMatch ? (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">
+                  {nextMatchGroup.toUpperCase()} · NEXT MATCH
+                </div>
+                <Matchup match={nextMatch} group={nextMatchGroup} />
+                <p>
+                  {dateText(nextMatch.match_date)} ·{' '}
+                  {nextMatch.match_time.slice(0, 5)} · {nextMatch.court}
+                </p>
+              </div>
+
+              <div className="badge">UPCOMING</div>
+            </section>
+          ) : (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">NEXT MATCH</div>
+                <h1>No upcoming matches scheduled.</h1>
+                <p>Schedule the next match to get started.</p>
+              </div>
+
+              <div className="badge">UPCOMING</div>
+            </section>
+          )}
+
           <div className="tabs">
             {(['Group A', 'Group B'] as Group[]).map(g => (
               <button
@@ -697,32 +731,6 @@ export default function Page() {
               </button>
             ))}
           </div>
-
-          {next ? (
-            <section className="hero">
-              <div>
-                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-                <Matchup match={next} group={group} />
-                <p>
-                  {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
-                  {next.court}
-                </p>
-                <button onClick={() => begin(next)}>Update match</button>
-              </div>
-
-              <div className="badge">UPCOMING</div>
-            </section>
-          ) : (
-            <section className="hero">
-              <div>
-                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-                <h1>No upcoming matches scheduled.</h1>
-                <p>Schedule the next match to get started.</p>
-              </div>
-
-              <button onClick={() => begin()}>Schedule match</button>
-            </section>
-          )}
 
           <div className="filters">
             {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
@@ -809,9 +817,7 @@ export default function Page() {
             <h2>Find a fair date and available opponent</h2>
             <p>
               Select your group and team, then set rest-day rules for both sides.
-              Already scheduled or completed matchups are never suggested. Rest
-              days count completed matches and scheduled upcoming matches before
-              and after the suggested date.
+              Already scheduled or completed matchups are never suggested.
             </p>
           </div>
 
@@ -931,12 +937,12 @@ export default function Page() {
                   <p className="gap-text">
                     Your rest:{' '}
                     {suggestion.yourGap === 99
-                      ? 'No nearby match'
+                      ? 'No prior match'
                       : `${suggestion.yourGap} days`}
                     <br />
                     Opponent rest:{' '}
                     {suggestion.opponentGap === 99
-                      ? 'No nearby match'
+                      ? 'No prior match'
                       : `${suggestion.opponentGap} days`}
                   </p>
 
