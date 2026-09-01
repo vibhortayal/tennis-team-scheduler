@@ -471,7 +471,13 @@ export default function Page() {
 
   const completed = scoped.filter(m => m.status === 'Completed');
   const cancelled = scoped.filter(m => m.status === 'Cancelled');
-  const next = upcoming[0];
+  const nextMatch = matches
+    .filter(
+      m => m.status === 'Scheduled' && matchDateTime(m) >= nowInFremont
+    )
+    .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)))[0];
+
+  const nextMatchGroup: Group = (nextMatch?.league_group || 'Group B') as Group;
 
   const begin = (m?: Match) => {
     setEditing(m || null);
@@ -660,7 +666,8 @@ export default function Page() {
         .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
         .tabs button{flex:1;background:transparent;color:#57705e}
         .tabs button.active{background:#147a42;color:#fff}
-        .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef)}
+        .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef);margin:18px 0 0}
+        .group-schedule{margin:0 0 16px}
         .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
         .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
         .filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
@@ -718,11 +725,8 @@ export default function Page() {
 
       <header className="top">
         <div>
-          <b>🎾 Tennis League</b>
-          <div>Group-stage match dashboard</div>
+          <b>🎾 Innovation Tennis Open</b>
         </div>
-
-        <button onClick={() => begin()}>Schedule match</button>
       </header>
 
       <div className="tabs">
@@ -745,6 +749,33 @@ export default function Page() {
 
       {view === 'dashboard' ? (
         <>
+          {nextMatch ? (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">
+                  {nextMatchGroup.toUpperCase()} · NEXT MATCH
+                </div>
+                <Matchup match={nextMatch} group={nextMatchGroup} />
+                <p>
+                  {dateText(nextMatch.match_date)} ·{' '}
+                  {nextMatch.match_time.slice(0, 5)} · {nextMatch.court}
+                </p>
+              </div>
+
+              <div className="badge">UPCOMING</div>
+            </section>
+          ) : (
+            <section className="hero">
+              <div>
+                <div className="eyebrow">NEXT MATCH</div>
+                <h1>No upcoming matches scheduled.</h1>
+                <p>Schedule the next match to get started.</p>
+              </div>
+
+              <div className="badge">UPCOMING</div>
+            </section>
+          )}
+
           <div className="tabs">
             {(['Group A', 'Group B'] as Group[]).map(g => (
               <button
@@ -757,31 +788,9 @@ export default function Page() {
             ))}
           </div>
 
-          {next ? (
-            <section className="hero">
-              <div>
-                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-                <Matchup match={next} group={group} />
-                <p>
-                  {dateText(next.match_date)} · {next.match_time.slice(0, 5)} ·{' '}
-                  {next.court}
-                </p>
-                <button onClick={() => begin(next)}>Update match</button>
-              </div>
-
-              <div className="badge">UPCOMING</div>
-            </section>
-          ) : (
-            <section className="hero">
-              <div>
-                <div className="eyebrow">{group.toUpperCase()} · NEXT MATCH</div>
-                <h1>No upcoming matches scheduled.</h1>
-                <p>Schedule the next match to get started.</p>
-              </div>
-
-              <button onClick={() => begin()}>Schedule match</button>
-            </section>
-          )}
+          <button className="group-schedule" onClick={() => begin()}>
+            Schedule match
+          </button>
 
           <div className="filters">
             {['All', 'Scheduled', 'Completed', 'Cancelled'].map(x => (
