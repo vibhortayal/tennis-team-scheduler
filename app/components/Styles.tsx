@@ -10,6 +10,8 @@ export function Styles() {
       .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
       .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
       .identity-select{width:auto;min-width:190px;max-width:260px;background:#eaf4eb;color:#17663d;font-weight:700}
+      .identity-picker{display:flex;align-items:center;gap:8px}
+.identity-picker-label{font-size:12px;font-weight:700;color:#17663d;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
       .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
       .tabs button{flex:1;background:transparent;color:#57705e}
       .tabs button.active{background:#147a42;color:#fff}
