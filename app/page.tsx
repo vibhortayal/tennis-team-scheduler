@@ -612,6 +612,9 @@ export default function Page() {
         .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
         .tabs button{flex:1;background:transparent;color:#57705e}
         .tabs button.active{background:#147a42;color:#fff}
+        .group-bar{display:flex;gap:8px;align-items:center;margin:18px 0}
+        .group-bar .tabs{flex:1;margin:0}
+        .group-bar > button{white-space:nowrap}
         .hero{padding:24px;display:flex;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#fff,#edf8ef);margin:18px 0 0}
         .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
         .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
@@ -661,16 +664,14 @@ export default function Page() {
           .wide{grid-column:auto}
           .hero{display:block}
           .badge{display:inline-block;margin-top:12px}
+          .group-bar{flex-direction:column;align-items:stretch}
         }
       `}</style>
 
       <header className="top">
         <div>
-          <b>🎾 Tennis League</b>
-          <div>Group-stage match dashboard</div>
+          <b>🎾 Innovation Tennis Open</b>
         </div>
-
-        <button onClick={() => begin()}>Schedule match</button>
       </header>
 
       <div className="tabs">
@@ -720,16 +721,20 @@ export default function Page() {
             </section>
           )}
 
-          <div className="tabs">
-            {(['Group A', 'Group B'] as Group[]).map(g => (
-              <button
-                className={group === g ? 'active' : ''}
-                onClick={() => setGroup(g)}
-                key={g}
-              >
-                {g} · {groups[g].length} teams
-              </button>
-            ))}
+          <div className="group-bar">
+            <div className="tabs">
+              {(['Group A', 'Group B'] as Group[]).map(g => (
+                <button
+                  className={group === g ? 'active' : ''}
+                  onClick={() => setGroup(g)}
+                  key={g}
+                >
+                  {g} · {groups[g].length} teams
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => begin()}>Schedule match</button>
           </div>
 
           <div className="filters">
