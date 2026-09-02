@@ -1,5 +1,5 @@
 /**
- * Pure scoring helpers — no React, no Supabase, no side effects.
+ * Pure scoring helpers - no React, no Supabase, no side effects.
  * All standings computation lives here so it can be tested in isolation.
  */
 
@@ -17,7 +17,7 @@ export type SetScore = {
 
 /**
  * Structured per-set scores stored alongside the human-readable result string.
- * All three fields are optional — legacy matches only have `result` text.
+ * All three fields are optional - legacy matches only have `result` text.
  */
 export type MatchScores = {
   set1?: SetScore;
@@ -42,53 +42,55 @@ export const blankScoreEntry = (): ScoreEntryState => ({
   set3A: '',
   set3B: '',
 });
-
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
 export type ScoreValidationResult =
-  | { valid: true; scores: MatchScores; result: string }
-  | { valid: false; error: string };
+  | { ok: true; scores: MatchScores; result: string }
+  | { ok: false; error: string };
 
-const parseSet = (
-  a: string,
-  b: string,
-): { ok: true; score: SetScore } | { ok: false; error: string } => {
+type ParsedSet =
+  | { ok: true; score: SetScore }
+  | { ok: false; error: string };
+
+const parseSet = (a: string, b: string): ParsedSet => {
   const na = Number(a.trim());
   const nb = Number(b.trim());
   if (!Number.isInteger(na) || na < 0 || !Number.isInteger(nb) || nb < 0) {
     return { ok: false, error: 'Set scores must be non-negative integers.' };
   }
   if (na === nb) {
-    return { ok: false, error: `A set cannot end in a tie (${na}–${nb}).` };
+    return { ok: false, error: `A set cannot end in a tie (${na}-${nb}).` };
   }
   return { ok: true, score: { teamA: na, teamB: nb } };
 };
 
-export function validateScores(
-  entry: ScoreEntryState,
-): ScoreValidationResult {
+export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
   // Set 1 required
   if (!entry.set1A.trim() || !entry.set1B.trim()) {
-    return { valid: false, error: 'Set 1 scores are required.' };
+    return { ok: false, error: 'Set 1 scores are required.' };
   }
   const r1 = parseSet(entry.set1A, entry.set1B);
-  if (!r1.ok) return { valid: false, error: `Set 1: ${r1.error}` };
+  if (r1.ok === false) {
+    return { ok: false, error: `Set 1: ${r1.error}` };
+  }
 
   // Set 2 required
   if (!entry.set2A.trim() || !entry.set2B.trim()) {
-    return { valid: false, error: 'Set 2 scores are required.' };
+    return { ok: false, error: 'Set 2 scores are required.' };
   }
   const r2 = parseSet(entry.set2A, entry.set2B);
-  if (!r2.ok) return { valid: false, error: `Set 2: ${r2.error}` };
+  if (r2.ok === false) {
+    return { ok: false, error: `Set 2: ${r2.error}` };
+  }
 
-  // Set 3 — either fully blank or fully filled
+  // Set 3 - either fully blank or fully filled
   const s3aBlank = !entry.set3A.trim();
   const s3bBlank = !entry.set3B.trim();
   if (s3aBlank !== s3bBlank) {
     return {
-      valid: false,
+      ok: false,
       error: 'Set 3 must be either fully filled or fully blank.',
     };
   }
@@ -96,7 +98,9 @@ export function validateScores(
   let set3: SetScore | undefined;
   if (!s3aBlank) {
     const r3 = parseSet(entry.set3A, entry.set3B);
-    if (!r3.ok) return { valid: false, error: `Set 3: ${r3.error}` };
+    if (r3.ok === false) {
+      return { ok: false, error: `Set 3: ${r3.error}` };
+    }
     set3 = r3.score;
   }
 
@@ -115,7 +119,7 @@ export function validateScores(
 
   if (aWins < 2 && bWins < 2) {
     return {
-      valid: false,
+      ok: false,
       error: 'One team must win at least two sets.',
     };
   }
@@ -131,12 +135,11 @@ export function validateScores(
   const result = parts.join(', ');
 
   return {
-    valid: true,
+    ok: true,
     scores: { set1: r1.score, set2: r2.score, set3 },
     result,
   };
 }
-
 /**
  * Parse a legacy result string like "6-3, 6-4" or "6-3, 4-6, 10-7"
  * into structured SetScores. Returns null if unparseable.
@@ -160,7 +163,9 @@ export function parseResultString(result: string): MatchScores | null {
 /**
  * Populate a ScoreEntryState from an existing result string (for editing).
  */
-export function scoreEntryFromResult(result: string | null | undefined): ScoreEntryState {
+export function scoreEntryFromResult(
+  result: string | null | undefined,
+): ScoreEntryState {
   if (!result) return blankScoreEntry();
   const parsed = parseResultString(result);
   if (!parsed) return blankScoreEntry();
@@ -180,10 +185,10 @@ export function scoreEntryFromResult(result: string | null | undefined): ScoreEn
 
 export type TeamStandingRow = {
   teamId: string;
-  teamLabel: string;    // "#2 · Sudharssun & Kaushik"
-  players: string;      // "Sudharssun & Kaushik"
+  teamLabel: string;
+  players: string;
   group: Group;
-  totalMatches: number; // 5 for Group A, 6 for Group B
+  totalMatches: number;
   matchesPlayed: number;
   matchesRemaining: number;
   matchesWon: number;
@@ -216,7 +221,6 @@ function matchWinner(result: string): 'a' | 'b' | null {
   if (bWins >= 2) return 'b';
   return null;
 }
-
 /**
  * Count total games won and lost by a team in a match.
  * teamA is the team that appears first in the matchup string.
@@ -263,7 +267,7 @@ export function computeStandings(
   const rows: TeamStandingRow[] = roster.map(([teamId, names]) => {
     const [first, second] = names.split(',').map(n => n.trim());
     const players = `${first} & ${second}`;
-    const teamLabel = `#${teamId} · ${players}`;
+    const teamLabel = `#${teamId} - ${players}`;
 
     let matchesWon = 0;
     let matchesLost = 0;
@@ -284,7 +288,7 @@ export function computeStandings(
         if (!isTeamA) matchesWon++;
         else matchesLost++;
       } else {
-        // Unparseable winner — skip for points but count games
+        // Unparseable winner - skip for points but count games
         continue;
       }
 
@@ -311,7 +315,7 @@ export function computeStandings(
       netScoreRate,
       gamesWon,
       gamesLost,
-      groupRank: 0, // assigned below
+      groupRank: 0,
     };
   });
 
