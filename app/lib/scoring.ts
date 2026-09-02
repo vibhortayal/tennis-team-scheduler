@@ -141,18 +141,19 @@ export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
   };
 }
 /**
- * Parse a legacy result string like "6-3, 6-4" or "6-3, 4-6, 10-7"
+  * Parse a result string like "6-3, 6-4" or "Team #9 def. Team #11, 6-1, 6-4"
  * into structured SetScores. Returns null if unparseable.
  */
 export function parseResultString(result: string): MatchScores | null {
   const parts = result.split(',').map(s => s.trim());
-  if (parts.length < 2 || parts.length > 3) return null;
+    if (parts.length < 2) return null;
   const parsed: SetScore[] = [];
   for (const part of parts) {
-    const match = /^(\d+)-(\d+)$/.exec(part);
-    if (!match) return null;
+        const match = /(\d+)-(\d+)/.exec(part);
+        if (!match) continue;
     parsed.push({ teamA: parseInt(match[1], 10), teamB: parseInt(match[2], 10) });
   }
+  if (parsed.length < 2 || parsed.length > 3) return null;
   return {
     set1: parsed[0],
     set2: parsed[1],
