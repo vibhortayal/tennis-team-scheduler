@@ -85,26 +85,49 @@ export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
     return { ok: false, error: `Set 2: ${r2.error}` };
   }
 
-  // Set 3 - either fully blank or fully filled
-  const s3aBlank = !entry.set3A.trim();
-  const s3bBlank = !entry.set3B.trim();
-  if (s3aBlank !== s3bBlank) {
-    return {
-      ok: false,
-      error: 'Set 3 must be either fully filled or fully blank.',
-    };
-  }
+  // Determine whether the match is already decided after two sets.
+  // If so, set 3 is irrelevant and may be left empty (or ignored entirely).
+  const aWinsFirstTwo =
+    (r1.score.teamA > r1.score.teamB ? 1 : 0) +
+    (r2.score.teamA > r2.score.teamB ? 1 : 0);
+  const bWinsFirstTwo =
+    (r1.score.teamB > r1.score.teamA ? 1 : 0) +
+    (r2.score.teamB > r2.score.teamA ? 1 : 0);
+  const decidedInTwo = aWinsFirstTwo === 2 || bWinsFirstTwo === 2;
 
   let set3: SetScore | undefined;
-  if (!s3aBlank) {
+
+  if (!decidedInTwo) {
+    // Match split 1-1 after two sets, so a valid third set is required.
+    const s3aBlank = !entry.set3A.trim();
+    const s3bBlank = !entry.set3B.trim();
+    if (s3aBlank !== s3bBlank) {
+      return {
+        ok: false,
+        error: 'Set 3 must be either fully filled or fully blank.',
+      };
+    }
+    if (s3aBlank) {
+      return {
+        ok: false,
+        error: 'Set 3 scores are required when the match is split 1-1.',
+      };
+    }
     const r3 = parseSet(entry.set3A, entry.set3B);
     if (r3.ok === false) {
       return { ok: false, error: `Set 3: ${r3.error}` };
     }
     set3 = r3.score;
+  } else if (entry.set3A.trim() && entry.set3B.trim()) {
+    // Match already decided 2-0, but a third set was entered anyway.
+    // Keep it only if it is a valid set; otherwise ignore silently.
+    const r3 = parseSet(entry.set3A, entry.set3B);
+    if (r3.ok === true) {
+      set3 = r3.score;
+    }
   }
 
-  // Determine set winners and overall match winner
+  // Determine overall match winner across all recorded sets.
   const aWins = [
     r1.score.teamA > r1.score.teamB,
     r2.score.teamA > r2.score.teamB,
@@ -141,16 +164,16 @@ export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
   };
 }
 /**
-  * Parse a result string like "6-3, 6-4" or "Team #9 def. Team #11, 6-1, 6-4"
+ * Parse a result string like "6-3, 6-4" or "Team #9 def. Team #11, 6-1, 6-4"
  * into structured SetScores. Returns null if unparseable.
  */
 export function parseResultString(result: string): MatchScores | null {
   const parts = result.split(',').map(s => s.trim());
-    if (parts.length < 2) return null;
+  if (parts.length < 2) return null;
   const parsed: SetScore[] = [];
   for (const part of parts) {
-        const match = /(\d+)-(\d+)/.exec(part);
-        if (!match) continue;
+    const match = /(\d+)-(\d+)/.exec(part);
+    if (!match) continue;
     parsed.push({ teamA: parseInt(match[1], 10), teamB: parseInt(match[2], 10) });
   }
   if (parsed.length < 2 || parsed.length > 3) return null;
