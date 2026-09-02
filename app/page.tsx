@@ -201,20 +201,24 @@ export default function Page() {
   const nowInFremont = fremontNow();
   const todayInFremont = currentDateInFremont();
 
-  const overdue = scoped.filter(
-    (match) => match.status === 'Scheduled' && matchDateTime(match) < nowInFremont
+  const { overdue, upcoming, completed, cancelled } = useMemo(() => {
+    const scheduled = scoped.filter((match) => match.status === 'Scheduled');
+
+    return {
+      overdue: scheduled.filter((match) => matchDateTime(match) < nowInFremont),
+      upcoming: scheduled.filter((match) => match.match_date >= todayInFremont),
+      completed: scoped.filter((match) => match.status === 'Completed'),
+      cancelled: scoped.filter((match) => match.status === 'Cancelled'),
+    };
+  }, [nowInFremont, scoped, todayInFremont]);
+
+  const upcomingAll = useMemo(
+    () =>
+      matches
+        .filter((match) => match.status === 'Scheduled' && match.match_date >= todayInFremont)
+        .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b))),
+    [matches, todayInFremont]
   );
-
-  const upcoming = scoped.filter(
-    (match) => match.status === 'Scheduled' && match.match_date >= todayInFremont
-  );
-
-  const completed = scoped.filter((match) => match.status === 'Completed');
-  const cancelled = scoped.filter((match) => match.status === 'Cancelled');
-
-  const upcomingAll = matches
-    .filter((match) => match.status === 'Scheduled' && match.match_date >= todayInFremont)
-    .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)));
 
   const nextMatchDate = upcomingAll[0]?.match_date || '';
 
@@ -293,13 +297,15 @@ export default function Page() {
       .map(([id]) => id)
       .filter((id) => id !== suggestionTeam)
       .filter((opponentId) => !existingFixture(matches, scheduleGroup, suggestionTeam, opponentId));
+    const teamMatches = new Map(
+      scheduleRoster.map(([id]) => [id, matchesForTeam(matches, scheduleGroup, id)])
+    );
+    const yourMatches = teamMatches.get(suggestionTeam) || [];
 
     const candidates: Suggestion[] = [];
 
     for (const opponentId of possibleOpponents) {
-      const yourMatches = matchesForTeam(matches, scheduleGroup, suggestionTeam);
-
-      const opponentMatches = matchesForTeam(matches, scheduleGroup, opponentId);
+      const opponentMatches = teamMatches.get(opponentId) || [];
 
       for (let offset = 1; offset <= 30; offset += 1) {
         const date = addDays(today, offset);
