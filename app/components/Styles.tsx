@@ -61,6 +61,9 @@ export function Styles() {
       .team-line{display:flex;align-items:center;gap:8px;min-width:0}
       .team-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:32px;height:26px;padding:0 8px;border-radius:999px;background:#eaf4eb;color:#17663d;font-size:12px;font-weight:800}
       .team-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#15231a;font-weight:750}
+      .team-line.winner .team-names{color:#147a42;font-weight:800}
+.team-line.winner .team-number{background:#147a42;color:#fff}
+.winner-badge{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;padding:2px 8px;border-radius:999px;background:#147a42;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
       .matchup{display:grid;gap:8px;margin:12px 0}
       .versus{color:#758278;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
       .team-with-info{display:grid;gap:6px;min-width:0}
