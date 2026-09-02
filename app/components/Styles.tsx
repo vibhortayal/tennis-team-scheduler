@@ -5,7 +5,7 @@ export function Styles() {
       body{margin:0;background:#f5f6f1;font-family:Arial;color:#15231a}
       main{max-width:1100px;margin:auto;padding:24px}
       button,select,input,textarea{font:inherit}
-      button{border:0;border-radius:9px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
+      button{border:0;border-radius:9px;min-height:44px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
       button:disabled{cursor:not-allowed;opacity:.55}
       .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
       .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -25,7 +25,7 @@ export function Styles() {
       .filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
       .filters button{background:#eaf4eb;color:#17663d}
       .filters button.active{background:#17231d;color:#fff}
-      select,input,textarea{padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:white}
+      select,input,textarea{min-height:44px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:white}
       .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
       .card{padding:16px}
       .card p{color:#5f7064}
@@ -198,12 +198,21 @@ export function Styles() {
 
       @media(max-width:650px){
         main{padding:14px}
-        .top{align-items:flex-start}
-        .identity-select{min-width:0;max-width:180px}
+        .top{display:grid;gap:14px}
+        .identity-picker{width:100%}
+        .identity-select{width:100%;min-width:0;max-width:none}
+        .tabs{overflow-x:auto;scrollbar-width:none}
+        .tabs::-webkit-scrollbar{display:none}
+        .tabs button{flex:0 0 auto;min-width:max-content}
         .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
         .wide{grid-column:auto}
         .hero{display:block}
         .badge{display:inline-block;margin-top:12px}
+        .filters select{flex-basis:100%;width:100%}
+        .modal{padding:0}
+        .modal-card{width:100%;height:100%;max-height:none;border-radius:0;padding:20px}
+        .modal-card .actions{position:sticky;bottom:-20px;padding:12px 0 0;background:#fff}
+        .modal-card .actions button{flex:1}
         .standings-table th,
         .standings-table td{padding:8px 8px;font-size:13px}
         .standings-players{display:none}
