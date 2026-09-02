@@ -22,6 +22,7 @@ import {
   currentDateInFremont,
   addDays,
   teamIds,
+  canUpdateMatch,
   existingFixture,
   matchesForTeam,
   restGapAroundDate,
@@ -220,22 +221,8 @@ export default function Page() {
 
   const nextMatches = upcomingAll.filter((match) => match.match_date === nextMatchDate);
 
-  /**
-   * UI-only eligibility check. It intentionally uses the match's own
-   * persisted group, not the currently selected dashboard group.
-   */
-  const canUpdateMatch = (match: Match) => {
-    const matchGroup = (match.league_group || 'Group B') as Group;
-
-    return (
-      !identity.viewing &&
-      Boolean(identity.teamId) &&
-      teamIds(match, matchGroup).includes(identity.teamId)
-    );
-  };
-
   const begin = (match?: Match) => {
-    if (match && !canUpdateMatch(match)) {
+    if (match && !canUpdateMatch(match, identity)) {
       setNote('Only players on this match can update it.');
       return;
     }
@@ -389,7 +376,7 @@ export default function Page() {
   const save = async (event: FormEvent, scores: ScoreEntryState) => {
     event.preventDefault();
 
-    if (editing && !canUpdateMatch(editing)) {
+    if (editing && !canUpdateMatch(editing, identity)) {
       setNote('Only players on this match can update it.');
       setOpen(false);
       return;
@@ -443,20 +430,30 @@ export default function Page() {
       result,
     };
 
-    const response = await fetch(editing ? `${api}?id=eq.${editing.id}` : api, {
-      method: editing ? 'PATCH' : 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(editing ? `${api}?id=eq.${editing.id}` : api, {
+        method: editing ? 'PATCH' : 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        setNote('Could not save the match.');
+        return;
+      }
+    } catch {
       setNote('Could not save the match.');
       return;
     }
 
     setOpen(false);
     setNote('Match saved successfully.');
-    load();
+    await load();
   };
 
   return (
@@ -586,7 +583,7 @@ export default function Page() {
 
               <div className="grid">
                 {overdue.map((match) => {
-                  const canUpdate = canUpdateMatch(match);
+                  const canUpdate = canUpdateMatch(match, identity);
 
                   return (
                     <article className="card overdue-card" key={match.id}>
@@ -634,7 +631,7 @@ export default function Page() {
             edit={begin}
             empty="No upcoming matches."
             group={group}
-            selectedTeamId={identity.viewing ? null : identity.teamId}
+            selectedIdentity={identity}
           />
 
           <Section
@@ -643,7 +640,7 @@ export default function Page() {
             edit={begin}
             empty="No completed matches."
             group={group}
-            selectedTeamId={identity.viewing ? null : identity.teamId}
+            selectedIdentity={identity}
           />
 
           <Section
@@ -652,7 +649,7 @@ export default function Page() {
             edit={begin}
             empty="No cancelled matches."
             group={group}
-            selectedTeamId={identity.viewing ? null : identity.teamId}
+            selectedIdentity={identity}
           />
         </>
       ) : view === 'standings' ? (

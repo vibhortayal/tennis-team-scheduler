@@ -1,4 +1,4 @@
-import { Group, groups } from '../teams';
+import { Group, groups, Identity } from '../teams';
 
 export type Match = {
   id: string;
@@ -94,6 +94,16 @@ export const teamIds = (m: Match, g: Group) =>
   Array.from(m.matchup.matchAll(/Team #(\d+)/g), (match) => match[1]).filter((id) =>
     groups[g].some(([teamId]) => teamId === id)
   );
+
+export const canUpdateMatch = (match: Match, identity: Identity) => {
+  const matchGroup = (match.league_group || 'Group B') as Group;
+
+  return (
+    !identity.viewing &&
+    Boolean(identity.teamId) &&
+    teamIds(match, matchGroup).includes(identity.teamId)
+  );
+};
 
 export const isSameFixture = (match: Match, group: Group, firstId: string, secondId: string) => {
   if ((match.league_group || 'Group B') !== group) return false;
