@@ -11,6 +11,11 @@ const eslintConfig = [
     rules: {
       // Initialization-style setState calls inside useEffect are intentional here.
       'react-hooks/set-state-in-effect': 'off',
+      // Allow intentionally-unused args/vars when prefixed with an underscore.
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
 ];
