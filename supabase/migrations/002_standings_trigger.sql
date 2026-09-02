@@ -143,9 +143,6 @@ BEGIN
                )
       LOOP
         -- Determine if this team is "team A" (first in matchup string)
-        is_a := (dm.matchup ~ ('^Team #' || r.team_number || '(\s|$|[^0-9])')
-                  OR dm.matchup ~ (' vs Team #' || r.team_number || '.*vs '));
-        -- Simpler: team is A if matchup starts with "Team #<num>"
         is_a := (m.matchup ~* ('^\s*Team\s+#' || r.team_number || '(\s|vs|$)'));
 
         win := public.result_winner(m.result);
@@ -182,7 +179,8 @@ BEGIN
       matches_lost      = v_losses,
       total_points      = v_wins * 2,
       net_score_rate    = v_games_won - v_games_lost,
-      games_won         = v_games_won
+      games_won         = v_games_won,
+      games_lost        = v_games_lost
     WHERE id = r.id;
   END LOOP;
 
