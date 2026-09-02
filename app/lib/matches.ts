@@ -17,6 +17,9 @@ export type Draft = Omit<Match, 'id'>;
 export type Suggestion = {
   opponentId: string;
   date: string;
+  startsAt?: string;
+  endsAt?: string;
+  alternateCount?: number;
   yourGap: number;
   opponentGap: number;
   score: number;
