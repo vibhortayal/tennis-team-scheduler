@@ -1,12 +1,7 @@
 import { FormEvent, useState, useEffect } from 'react';
 import { Group, Team, allPlayers, identityValue, teamDisplay, teamNames } from '../teams';
 import { Draft } from '../lib/matches';
-import {
-  ScoreEntryState,
-  blankScoreEntry,
-  scoreEntryFromResult,
-  validateScores,
-} from '../lib/scoring';
+import { ScoreEntryState, blankScoreEntry, scoreEntryFromResult } from '../lib/scoring';
 import { ScoreEntry } from './ScoreEntry';
 
 const sortedPlayers = [...allPlayers].sort((a, b) => a.name.localeCompare(b.name));
@@ -111,17 +106,7 @@ export function MatchModal({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (draft.status === 'Completed') {
-      const validation = validateScores(scoreEntry);
-      if (validation.ok === false) {
-        setScoreError(validation.error);
-        return;
-      }
-      setScoreError('');
-      onSubmit(e, scoreEntry);
-    } else {
-      onSubmit(e, scoreEntry);
-    }
+    onSubmit(e, scoreEntry);
   };
 
   // Labels shown next to score inputs
@@ -203,7 +188,6 @@ export function MatchModal({
               error={scoreError}
               onChange={(next) => {
                 setScoreEntry(next);
-                setScoreError('');
               }}
             />
           )}
