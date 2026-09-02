@@ -54,77 +54,40 @@ type ParsedSet =
   | { ok: true; score: SetScore }
   | { ok: false; error: string };
 
+// Empty inputs are treated as 0. Ties are allowed (no set-tie restriction).
 const parseSet = (a: string, b: string): ParsedSet => {
-  const na = Number(a.trim());
-  const nb = Number(b.trim());
+  const na = a.trim() === '' ? 0 : Number(a.trim());
+  const nb = b.trim() === '' ? 0 : Number(b.trim());
   if (!Number.isInteger(na) || na < 0 || !Number.isInteger(nb) || nb < 0) {
     return { ok: false, error: 'Set scores must be non-negative integers.' };
-  }
-  if (na === nb) {
-    return { ok: false, error: `A set cannot end in a tie (${na}-${nb}).` };
   }
   return { ok: true, score: { teamA: na, teamB: nb } };
 };
 
 export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
-  // Set 1 required
-  if (!entry.set1A.trim() || !entry.set1B.trim()) {
-    return { ok: false, error: 'Set 1 scores are required.' };
-  }
+  // Set 1 - empty values are treated as 0.
   const r1 = parseSet(entry.set1A, entry.set1B);
   if (r1.ok === false) {
     return { ok: false, error: `Set 1: ${r1.error}` };
   }
 
-  // Set 2 required
-  if (!entry.set2A.trim() || !entry.set2B.trim()) {
-    return { ok: false, error: 'Set 2 scores are required.' };
-  }
+  // Set 2 - empty values are treated as 0.
   const r2 = parseSet(entry.set2A, entry.set2B);
   if (r2.ok === false) {
     return { ok: false, error: `Set 2: ${r2.error}` };
   }
 
-  // Determine whether the match is already decided after two sets.
-  // If so, set 3 is irrelevant and may be left empty (or ignored entirely).
-  const aWinsFirstTwo =
-    (r1.score.teamA > r1.score.teamB ? 1 : 0) +
-    (r2.score.teamA > r2.score.teamB ? 1 : 0);
-  const bWinsFirstTwo =
-    (r1.score.teamB > r1.score.teamA ? 1 : 0) +
-    (r2.score.teamB > r2.score.teamA ? 1 : 0);
-  const decidedInTwo = aWinsFirstTwo === 2 || bWinsFirstTwo === 2;
-
+  // Set 3 - optional. A fully blank third set means it was not played.
+  // If either field has a value, the set is recorded (empty side counts as 0).
   let set3: SetScore | undefined;
-
-  if (!decidedInTwo) {
-    // Match split 1-1 after two sets, so a valid third set is required.
-    const s3aBlank = !entry.set3A.trim();
-    const s3bBlank = !entry.set3B.trim();
-    if (s3aBlank !== s3bBlank) {
-      return {
-        ok: false,
-        error: 'Set 3 must be either fully filled or fully blank.',
-      };
-    }
-    if (s3aBlank) {
-      return {
-        ok: false,
-        error: 'Set 3 scores are required when the match is split 1-1.',
-      };
-    }
+  const s3aBlank = entry.set3A.trim() === '';
+  const s3bBlank = entry.set3B.trim() === '';
+  if (!s3aBlank || !s3bBlank) {
     const r3 = parseSet(entry.set3A, entry.set3B);
     if (r3.ok === false) {
       return { ok: false, error: `Set 3: ${r3.error}` };
     }
     set3 = r3.score;
-  } else if (entry.set3A.trim() && entry.set3B.trim()) {
-    // Match already decided 2-0, but a third set was entered anyway.
-    // Keep it only if it is a valid set; otherwise ignore silently.
-    const r3 = parseSet(entry.set3A, entry.set3B);
-    if (r3.ok === true) {
-      set3 = r3.score;
-    }
   }
 
   // Determine overall match winner across all recorded sets.
