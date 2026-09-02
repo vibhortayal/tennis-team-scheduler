@@ -1,33 +1,69 @@
 # Tennis Team Scheduler
 
-A Supabase + Next.js starter for scheduling doubles tennis matches. Any rostered player may propose a slot; a slot is confirmed only after every named participant explicitly approves.
+A Next.js dashboard for managing doubles tennis matches across the supplied Group A and Group B rosters. The app reads and writes match records through the Supabase REST API and calculates standings in the browser.
 
-## Included
+## Features
 
-- Postgres schema, constraints, RLS, and secure RPCs
-- The seven teams from the supplied roster as seed data
-- Pending-proposal dashboard UI
-- Database-enforced unanimous approval and conflict checks
-- Reminder/notification data model
+- Dashboard with the next scheduled match, overdue matches, upcoming matches, recent results, and cancelled matches.
+- Group and status filters, plus filtering by team.
+- Schedule and edit matches with date, time, court, status, result, and cancellation reason fields.
+- Score entry for best-of-three matches. Completed matches require two winning sets, and each recorded set must have a winner.
+- Smart Scheduling suggestions based on opponent availability and configurable rest-day gaps.
+- Standings ranked by points, net score rate, match wins, and team number.
+- Player picker that highlights the selected team and controls Smart Scheduling eligibility.
+
+## Requirements
+
+- Node.js with npm.
+- A Supabase project with a REST-accessible `dashboard_matches` table.
+- The `dashboard_matches` table should expose these fields: `id`, `matchup`, `match_date`, `match_time`, `court`, `status`, `result`, `cancellation_reason`, and `league_group`.
 
 ## Local setup
 
-1. Create a Supabase project and copy its URL and anonymous key.
-2. Run `supabase/migrations/001_initial.sql` in the Supabase SQL Editor.
-3. Create a Next.js app around these files or copy this repository into one, then install: `npm install next react react-dom @supabase/ssr @supabase/supabase-js`.
-4. Copy `.env.example` to `.env.local` and set both public values.
-5. Run `npm run dev`.
+Install dependencies from the repository root:
 
-## Scheduling rule
+```bash
+npm install
+```
 
-A proposal has one response row per active player on both teams. `respond_to_proposal` writes only the signed-in player’s response. After every approval it invokes `try_confirm_proposal`; confirmation occurs only when every participant status is `approved`. The function checks for overlap on the court, either team, and each named player again immediately before confirmation.
+Create `.env.local` with the Supabase project URL and a public key:
 
-For a date/time change, expire or cancel the old proposal and create a new proposal. This always starts a fresh approval cycle.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-public-key
+```
 
-## Production checklist
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is also supported for projects that use the older variable name. Do not put a service-role key in a `NEXT_PUBLIC_` variable.
 
-- Configure Supabase Auth (magic-link email or Google).
-- Create player profiles after sign-in and link them to `team_members`.
-- Add an Edge Function or cron job to deliver pending-response reminders.
-- Add an email provider and optional SMS opt-in; store notification delivery status.
-- Add a service-role-only admin interface for fixtures, rosters, courts, and results.
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The app is available at `http://localhost:3000` by default.
+
+## Project commands
+
+```bash
+npm run lint       # Run ESLint
+npm run build      # Create a production build
+npm run start      # Serve the production build
+npm run format     # Check Prettier formatting
+npm run format:fix # Apply Prettier formatting
+```
+
+## Data and migrations
+
+The frontend currently uses the `dashboard_matches` REST endpoint and does not call the proposal RPCs. Migration `001_initial.sql` creates the earlier proposal-oriented tables (`fixtures`, `match_proposals`, participants, responses, and notifications). Migration `002_standings_trigger.sql` defines the standings trigger for `dashboard_matches` and `team_standings`, but those dashboard tables are not created by the current migrations.
+
+Before applying migration 002, provide the dashboard tables and their required permissions in Supabase. Treat the current player picker as a UI convenience only: it stores the selected identity in local storage and is not authentication or authorization. A production deployment must add Supabase Auth and enforce team membership and match-update permissions with RLS or server-side mutations.
+
+## Roster
+
+The roster is defined in `app/teams.ts`:
+
+- Group A: Teams 2, 5, 7, 9, 11, and 12.
+- Group B: Teams 1, 3, 4, 6, 8, 10, and 13.
+
+The default view is Group A when no player is selected. Selecting a player switches the relevant dashboard, scheduling, and standings context to that player's group.
