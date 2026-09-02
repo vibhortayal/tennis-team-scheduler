@@ -233,7 +233,7 @@ const TOTAL_MATCHES: Record<Group, number> = {
  * Determine match winner from a structured result string.
  * Returns 'a' | 'b' | null.
  */
-function matchWinner(result: string): 'a' | 'b' | null {
+export function matchWinner(result: string): 'a' | 'b' | null {
   const scores = parseResultString(result);
   if (!scores || !scores.set1 || !scores.set2) return null;
   const sets = [scores.set1, scores.set2, scores.set3].filter(
