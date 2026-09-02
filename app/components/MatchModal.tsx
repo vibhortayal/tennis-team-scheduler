@@ -7,7 +7,7 @@ import {
   teamDisplay,
   teamNames,
 } from '../teams';
-import { Draft, teamIds } from '../lib/matches';
+import { Draft } from '../lib/matches';
 import {
   ScoreEntryState,
   blankScoreEntry,
@@ -73,7 +73,6 @@ export function IdentityPrompt({
     </div>
   );
 }
-
 type MatchModalProps = {
   group: Group;
   roster: readonly Team[];
@@ -131,7 +130,7 @@ export function MatchModal({
     e.preventDefault();
     if (draft.status === 'Completed') {
       const validation = validateScores(scoreEntry);
-      if (!validation.valid) {
+      if (validation.ok === false) {
         setScoreError(validation.error);
         return;
       }
@@ -145,15 +144,12 @@ export function MatchModal({
   };
 
   // Labels shown next to score inputs
-  const firstLabel =
-    roster.find(([id]) => id === first)
-      ? `#${first} ${teamNames(group, first)}`
-      : `#${first}`;
-  const secondLabel =
-    roster.find(([id]) => id === second)
-      ? `#${second} ${teamNames(group, second)}`
-      : `#${second}`;
-
+  const firstLabel = roster.find(([id]) => id === first)
+    ? `#${first} ${teamNames(group, first)}`
+    : `#${first}`;
+  const secondLabel = roster.find(([id]) => id === second)
+    ? `#${second} ${teamNames(group, second)}`
+    : `#${second}`;
   return (
     <div className="modal">
       <form onSubmit={handleSubmit} className="modal-card">
@@ -164,10 +160,7 @@ export function MatchModal({
         <div className="fields">
           <label className="field">
             First team
-            <select
-              value={first}
-              onChange={e => onFirst(e.target.value)}
-            >
+            <select value={first} onChange={e => onFirst(e.target.value)}>
               {roster
                 .filter(([id]) => id !== second)
                 .map(([id]) => (
@@ -179,10 +172,7 @@ export function MatchModal({
           </label>
           <label className="field">
             Opponent
-            <select
-              value={second}
-              onChange={e => onSecond(e.target.value)}
-            >
+            <select value={second} onChange={e => onSecond(e.target.value)}>
               {roster
                 .filter(([id]) => id !== first)
                 .map(([id]) => (
@@ -197,9 +187,7 @@ export function MatchModal({
             <input
               type="date"
               value={draft.match_date}
-              onChange={e =>
-                onDraft({ ...draft, match_date: e.target.value })
-              }
+              onChange={e => onDraft({ ...draft, match_date: e.target.value })}
             />
           </label>
           <label className="field">
@@ -207,9 +195,7 @@ export function MatchModal({
             <input
               type="time"
               value={draft.match_time}
-              onChange={e =>
-                onDraft({ ...draft, match_time: e.target.value })
-              }
+              onChange={e => onDraft({ ...draft, match_time: e.target.value })}
             />
           </label>
           <label className="field">
@@ -250,10 +236,7 @@ export function MatchModal({
               <textarea
                 value={draft.cancellation_reason || ''}
                 onChange={e =>
-                  onDraft({
-                    ...draft,
-                    cancellation_reason: e.target.value,
-                  })
+                  onDraft({ ...draft, cancellation_reason: e.target.value })
                 }
               />
             </label>
