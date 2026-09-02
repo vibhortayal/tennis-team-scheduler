@@ -11,7 +11,7 @@ export function Styles() {
       .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
       .identity-select{width:auto;min-width:190px;max-width:260px;background:#eaf4eb;color:#17663d;font-weight:700}
       .identity-picker{display:flex;align-items:center;gap:8px}
-.identity-picker-label{font-size:12px;font-weight:700;color:#17663d;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+      .identity-picker-label{font-size:12px;font-weight:700;color:#17663d;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
       .tabs{display:flex;padding:5px;margin:18px 0;gap:5px}
       .tabs button{flex:1;background:transparent;color:#57705e}
       .tabs button.active{background:#147a42;color:#fff}
@@ -54,6 +54,7 @@ export function Styles() {
 
       .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
       .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
+      .field-label{font-size:13px;font-weight:bold;color:#15231a}
       .wide{grid-column:1/-1}
       .actions{margin-top:20px;display:flex;justify-content:flex-end;gap:8px}
       .secondary{background:#eaf4eb;color:#17663d}
@@ -89,6 +90,109 @@ export function Styles() {
       .suggestion-card{border-color:#c3dac8;background:#ffffff}
       .suggestion-card > small{color:#147a42;font-weight:800;letter-spacing:.7px}
       .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
+
+      /* === Score entry === */
+      .score-entry{
+        display:grid;gap:10px;
+        padding:14px;border-radius:10px;
+        background:#f1f7f1;
+        border:1px solid #d6dfd5;
+      }
+      .score-entry-header{display:flex;align-items:center;justify-content:space-between}
+      .score-entry-legend{
+        display:grid;grid-template-columns:1fr auto 1fr;
+        gap:6px;align-items:center;
+        font-size:12px;font-weight:700;color:#47614d;
+        margin-bottom:4px;
+      }
+      .score-legend-left{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .score-legend-right{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+      .score-legend-vs{color:#8a9d8e;font-size:11px;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.5px}
+      .set-row{
+        display:grid;grid-template-columns:48px 1fr;
+        gap:8px;align-items:center;
+      }
+      .set-label{font-size:12px;font-weight:700;color:#47614d;white-space:nowrap}
+      .set-optional{font-weight:400;color:#8a9d8e}
+      .set-inputs{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+      .set-team-input{display:flex;align-items:center;gap:6px}
+      .set-team-input--right{flex-direction:row-reverse}
+      .set-team-name{
+        font-size:11px;color:#5f7064;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap;max-width:80px;
+        flex:1;min-width:0;
+      }
+      .score-input{
+        width:54px;min-width:0;padding:7px 6px;
+        text-align:center;font-weight:700;
+        border:1px solid #d6dfd5;border-radius:7px;background:#fff;
+      }
+      .score-input::-webkit-inner-spin-button,
+      .score-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+      .score-input[type=number]{-moz-appearance:textfield}
+      .set-vs{color:#758278;font-size:13px;font-weight:800;text-align:center}
+      .score-error{color:#a72c11;font-size:13px;font-weight:700;margin:4px 0 0;padding:8px 10px;background:#fff3ed;border-radius:7px;border-left:3px solid #d94924}
+
+      /* === Standings === */
+      .standings-wrap{margin-top:12px}
+      .standings-overflow{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .standings-table{
+        width:100%;border-collapse:collapse;
+        font-size:14px;
+        background:#fff;
+        border:1px solid #e0e8df;
+        border-radius:12px;
+        overflow:hidden;
+      }
+      .standings-table th,
+      .standings-table td{
+        padding:10px 12px;
+        text-align:left;
+        border-bottom:1px solid #e8ede7;
+        white-space:nowrap;
+      }
+      .standings-table thead th{
+        background:#eaf4eb;
+        color:#17663d;
+        font-size:12px;
+        font-weight:800;
+        text-transform:uppercase;
+        letter-spacing:.5px;
+      }
+      .standings-table tbody tr:last-child td{border-bottom:none}
+      .standings-table tbody tr:hover{background:#f6fbf6}
+      .standings-num{text-align:right;font-variant-numeric:tabular-nums}
+      .standings-pts{font-weight:700;color:#147a42}
+      .standings-nsr--pos{color:#147a42;font-weight:700}
+      .standings-nsr--neg{color:#a72c11;font-weight:700}
+      .standings-rank{font-weight:700;color:#5f7064}
+      .standings-team-cell{display:flex;align-items:center;gap:6px}
+      .standings-players{}
+      .standings-players-cell{color:#5f7064;font-size:13px}
+      .standings-q-badge{
+        display:inline-flex;align-items:center;justify-content:center;
+        width:22px;height:22px;border-radius:999px;
+        background:#147a42;color:#fff;
+        font-size:11px;font-weight:800;
+      }
+      .standings-qualifying td:first-child{}
+      .standings-own-team{background:#edf8ef !important}
+      .standings-own-team:hover{background:#e0f5e3 !important}
+      .standings-you{
+        display:inline-block;padding:2px 6px;
+        background:#147a42;color:#fff;
+        font-size:10px;font-weight:800;
+        border-radius:999px;letter-spacing:.4px;
+        margin-left:4px;text-transform:uppercase;
+        }
+        .standings-team-cell{flex-wrap:wrap}
+        .standings-team-players{flex-basis:100%;color:#5f7064;font-size:12px;line-height:1.3}        
+      .standings-footnote{
+        margin:10px 0 0;
+        font-size:12px;color:#758278;
+      }
+      .permission-note{font-size:12px;color:#758278;margin:4px 0 0}
+
       @media(max-width:650px){
         main{padding:14px}
         .top{align-items:flex-start}
@@ -97,6 +201,13 @@ export function Styles() {
         .wide{grid-column:auto}
         .hero{display:block}
         .badge{display:inline-block;margin-top:12px}
+        .standings-table th,
+        .standings-table td{padding:8px 8px;font-size:13px}
+        .standings-players{display:none}
+        .standings-players-cell{display:none}
+        .set-row{grid-template-columns:44px 1fr}
+        .score-input{width:46px}
+        .set-team-name{max-width:60px}
       }
     `}</style>
   );
