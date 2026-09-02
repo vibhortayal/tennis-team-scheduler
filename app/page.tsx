@@ -27,18 +27,21 @@ import {
   restGapAroundDate,
 } from './lib/matches';
 import { api, supabaseKey as key, headers } from './lib/supabase';
+import { computeStandings, ScoreEntryState } from './lib/scoring';
 import { Matchup, Section } from './components/MatchCard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { IdentityPrompt, MatchModal } from './components/MatchModal';
 import { SmartScheduling } from './components/SmartScheduling';
+import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
 
-type View = 'dashboard' | 'scheduling';
+type View = 'dashboard' | 'scheduling' | 'standings';
 
 export default function Page() {
   const [view, setView] = useState<View>('dashboard');
   const [group, setGroup] = useState<Group>('Group B');
   const [scheduleGroup, setScheduleGroup] = useState<Group>('Group B');
+  const [standingsGroup, setStandingsGroup] = useState<Group>('Group B');
   const [matches, setMatches] = useState<Match[]>([]);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
@@ -81,46 +84,48 @@ export default function Page() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-  try {
-    const saved = window.localStorage.getItem(IDENTITY_KEY);
+    try {
+      const saved = window.localStorage.getItem(IDENTITY_KEY);
 
-    if (!saved) {
-      return;
-    }
+      if (!saved) {
+        return;
+      }
 
-    const parsed = JSON.parse(saved) as Identity;
+      const parsed = JSON.parse(saved) as Identity;
 
-    const savedIdentity = parsed.viewing
-      ? viewingIdentity
-      : allPlayers.find(
-          player =>
-            player.name === parsed.name &&
-            player.teamId === parsed.teamId &&
-            player.group === parsed.group,
-        );
+      const savedIdentity = parsed.viewing
+        ? viewingIdentity
+        : allPlayers.find(
+            player =>
+              player.name === parsed.name &&
+              player.teamId === parsed.teamId &&
+              player.group === parsed.group,
+          );
 
-    if (!savedIdentity) {
-      return;
-    }
+      if (!savedIdentity) {
+        return;
+      }
 
-    setIdentity(savedIdentity);
+      setIdentity(savedIdentity);
 
-    if (savedIdentity.viewing) {
+      if (savedIdentity.viewing) {
+        setSuggestionTeam('');
+        return;
+      }
+
+      setGroup(savedIdentity.group);
+      setScheduleGroup(savedIdentity.group);
+      setStandingsGroup(savedIdentity.group);
+      setSuggestionTeam(savedIdentity.teamId);
+    } catch {
+      setIdentity(viewingIdentity);
       setSuggestionTeam('');
-      return;
     }
-
-    setGroup(savedIdentity.group);
-    setScheduleGroup(savedIdentity.group);
-    setSuggestionTeam(savedIdentity.teamId);
-  } catch {
-    setIdentity(viewingIdentity);
-    setSuggestionTeam('');
-  }
-}, []);
+  }, []);
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
@@ -133,6 +138,7 @@ export default function Page() {
     if (!nextIdentity.viewing) {
       setGroup(nextIdentity.group);
       setScheduleGroup(nextIdentity.group);
+      setStandingsGroup(nextIdentity.group);
       setSuggestionTeam(nextIdentity.teamId);
     } else {
       setSuggestionTeam('');
@@ -158,6 +164,15 @@ export default function Page() {
           (!team || teamIds(match, group).includes(team)),
       ),
     [matches, group, filter, team],
+  );
+
+  const standingsA = useMemo(
+    () => computeStandings(matches, 'Group A'),
+    [matches],
+  );
+  const standingsB = useMemo(
+    () => computeStandings(matches, 'Group B'),
+    [matches],
   );
 
   const opponentOptions = useMemo(
@@ -192,14 +207,12 @@ export default function Page() {
 
   const overdue = scoped.filter(
     match =>
-      match.status === 'Scheduled' &&
-      matchDateTime(match) < nowInFremont,
+      match.status === 'Scheduled' && matchDateTime(match) < nowInFremont,
   );
 
   const upcoming = scoped.filter(
     match =>
-      match.status === 'Scheduled' &&
-      matchDateTime(match) >= nowInFremont,
+      match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont,
   );
 
   const completed = scoped.filter(match => match.status === 'Completed');
@@ -246,11 +259,6 @@ export default function Page() {
       const matchRoster = groups[matchGroup];
       const ids = teamIds(match, matchGroup);
 
-      /**
-       * Do not call setGroup(matchGroup) here. The dashboard already scopes
-       * displayed matches by `group`, and changing the dashboard filter while
-       * opening an edit dialog would be an unexpected side effect.
-       */
       setDraft({ ...match, league_group: matchGroup });
       setFirst(ids[0] || matchRoster[0][0]);
       setSecond(ids[1] || matchRoster[1][0]);
@@ -258,8 +266,7 @@ export default function Page() {
       setDraft(blank(group));
       setFirst(identity.teamId || roster[0][0]);
       setSecond(
-        roster.find(([id]) => id !== identity.teamId)?.[0] ||
-          roster[0][0],
+        roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0][0],
       );
     }
 
@@ -427,13 +434,9 @@ export default function Page() {
     setNote('');
   };
 
-  const save = async (event: FormEvent) => {
+  const save = async (event: FormEvent, _scores: ScoreEntryState) => {
     event.preventDefault();
 
-    /**
-     * Defense in depth for the UI flow: a match cannot be updated after
-     * identity changes or if an edit is invoked outside the normal button.
-     */
     if (editing && !canUpdateMatch(editing)) {
       setNote('Only players on this match can update it.');
       setOpen(false);
@@ -450,6 +453,10 @@ export default function Page() {
       return;
     }
 
+    // Score validation is performed inside MatchModal before onSubmit fires;
+    // the validated result string has already been written into draft.result
+    // via onDraft at that point. We just guard against the legacy empty-result
+    // case for safety.
     if (draft.status === 'Completed' && !draft.result?.trim()) {
       setNote('Enter a result before completing the match.');
       return;
@@ -528,6 +535,13 @@ export default function Page() {
           onClick={() => setView('dashboard')}
         >
           Match Dashboard
+        </button>
+
+        <button
+          className={view === 'standings' ? 'active' : ''}
+          onClick={() => setView('standings')}
+        >
+          Standings
         </button>
 
         <button
@@ -718,6 +732,14 @@ export default function Page() {
             selectedTeamId={identity.viewing ? null : identity.teamId}
           />
         </>
+      ) : view === 'standings' ? (
+        <StandingsView
+          standingsA={standingsA}
+          standingsB={standingsB}
+          standingsGroup={standingsGroup}
+          onGroupChange={setStandingsGroup}
+          selectedTeamId={identity.viewing ? null : identity.teamId}
+        />
       ) : (
         <SmartScheduling
           identity={identity}
