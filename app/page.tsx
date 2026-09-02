@@ -83,7 +83,6 @@ export default function Page() {
 
   useEffect(() => {
     load();
-     
   }, []);
 
   useEffect(() => {
