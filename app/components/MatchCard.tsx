@@ -1,11 +1,25 @@
 import { Group, teamNames, teamDisplay } from '../teams';
 import { Match, dateText, teamIds, matchesForTeam, currentDateInFremont } from '../lib/matches';
+import { matchWinner } from '../lib/scoring';
 
-export function TeamLine({ group, id }: { group: Group; id: string }) {
+export function TeamLine({
+  group,
+  id,
+  winner = false,
+}: {
+  group: Group;
+  id: string;
+  winner?: boolean;
+}) {
   return (
-    <div className="team-line">
+    <div className={winner ? 'team-line winner' : 'team-line'}>
       <span className="team-number">#{id}</span>
       <span className="team-names">{teamNames(group, id)}</span>
+      {winner && (
+        <span className="winner-badge" aria-label="Winner" title="Winner">
+          ★ Winner
+        </span>
+      )}
     </div>
   );
 }
@@ -42,15 +56,16 @@ export function TeamContext({ group, id, matches }: { group: Group; id: string; 
 export function Matchup({ match, group }: { match: Match; group: Group }) {
   const ids = teamIds(match, group);
   if (ids.length !== 2) return <h3>{match.matchup}</h3>;
+  const isCompleted = match.status.toLowerCase() === 'completed';
+  const winner = isCompleted && match.result ? matchWinner(match.result) : null;
   return (
     <div className="matchup">
-      <TeamLine group={group} id={ids[0]} />
+      <TeamLine group={group} id={ids[0]} winner={winner === 'a'} />
       <span className="versus">vs</span>
-      <TeamLine group={group} id={ids[1]} />
+      <TeamLine group={group} id={ids[1]} winner={winner === 'b'} />
     </div>
   );
 }
-
 export function Section({
   title,
   list,
