@@ -47,19 +47,19 @@ export const blankScoreEntry = (): ScoreEntryState => ({
 // ---------------------------------------------------------------------------
 
 export type ScoreValidationResult =
-  | { ok: true; scores: MatchScores; result: string }
-  | { ok: false; error: string };
+  { ok: true; scores: MatchScores; result: string } | { ok: false; error: string };
 
-type ParsedSet =
-  | { ok: true; score: SetScore }
-  | { ok: false; error: string };
+type ParsedSet = { ok: true; score: SetScore } | { ok: false; error: string };
 
-// Empty inputs are treated as 0. Ties are allowed (no set-tie restriction).
+// Empty inputs are treated as 0. Every recorded set must have a winner.
 const parseSet = (a: string, b: string): ParsedSet => {
   const na = a.trim() === '' ? 0 : Number(a.trim());
   const nb = b.trim() === '' ? 0 : Number(b.trim());
   if (!Number.isInteger(na) || na < 0 || !Number.isInteger(nb) || nb < 0) {
     return { ok: false, error: 'Set scores must be non-negative integers.' };
+  }
+  if (na === nb) {
+    return { ok: false, error: 'Each set must have a winner.' };
   }
   return { ok: true, score: { teamA: na, teamB: nb } };
 };
@@ -111,10 +111,7 @@ export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
   }
 
   // Build human-readable result string
-  const parts = [
-    `${r1.score.teamA}-${r1.score.teamB}`,
-    `${r2.score.teamA}-${r2.score.teamB}`,
-  ];
+  const parts = [`${r1.score.teamA}-${r1.score.teamB}`, `${r2.score.teamA}-${r2.score.teamB}`];
   if (set3) {
     parts.push(`${set3.teamA}-${set3.teamB}`);
   }
@@ -131,13 +128,18 @@ export function validateScores(entry: ScoreEntryState): ScoreValidationResult {
  * into structured SetScores. Returns null if unparseable.
  */
 export function parseResultString(result: string): MatchScores | null {
-  const parts = result.split(',').map(s => s.trim());
+  const parts = result.split(',').map((s) => s.trim());
   if (parts.length < 2) return null;
   const parsed: SetScore[] = [];
   for (const part of parts) {
-    const match = /(\d+)-(\d+)/.exec(part);
-    if (!match) continue;
-    parsed.push({ teamA: parseInt(match[1], 10), teamB: parseInt(match[2], 10) });
+    const match = /^(\d+)-(\d+)$/.exec(part);
+    if (!match) return null;
+    const teamA = Number(match[1]);
+    const teamB = Number(match[2]);
+    if (!Number.isSafeInteger(teamA) || !Number.isSafeInteger(teamB) || teamA === teamB) {
+      return null;
+    }
+    parsed.push({ teamA, teamB });
   }
   if (parsed.length < 2 || parsed.length > 3) return null;
   return {
@@ -150,9 +152,7 @@ export function parseResultString(result: string): MatchScores | null {
 /**
  * Populate a ScoreEntryState from an existing result string (for editing).
  */
-export function scoreEntryFromResult(
-  result: string | null | undefined,
-): ScoreEntryState {
+export function scoreEntryFromResult(result: string | null | undefined): ScoreEntryState {
   if (!result) return blankScoreEntry();
   const parsed = parseResultString(result);
   if (!parsed) return blankScoreEntry();
@@ -200,10 +200,10 @@ export function matchWinner(result: string): 'a' | 'b' | null {
   const scores = parseResultString(result);
   if (!scores || !scores.set1 || !scores.set2) return null;
   const sets = [scores.set1, scores.set2, scores.set3].filter(
-    (s): s is SetScore => s !== undefined,
+    (s): s is SetScore => s !== undefined
   );
-  const aWins = sets.filter(s => s.teamA > s.teamB).length;
-  const bWins = sets.filter(s => s.teamB > s.teamA).length;
+  const aWins = sets.filter((s) => s.teamA > s.teamB).length;
+  const bWins = sets.filter((s) => s.teamB > s.teamA).length;
   if (aWins >= 2) return 'a';
   if (bWins >= 2) return 'b';
   return null;
@@ -212,14 +212,11 @@ export function matchWinner(result: string): 'a' | 'b' | null {
  * Count total games won and lost by a team in a match.
  * teamA is the team that appears first in the matchup string.
  */
-function gamesForTeam(
-  result: string,
-  isTeamA: boolean,
-): { won: number; lost: number } {
+function gamesForTeam(result: string, isTeamA: boolean): { won: number; lost: number } {
   const scores = parseResultString(result);
   if (!scores) return { won: 0, lost: 0 };
   const sets = [scores.set1, scores.set2, scores.set3].filter(
-    (s): s is SetScore => s !== undefined,
+    (s): s is SetScore => s !== undefined
   );
   let won = 0;
   let lost = 0;
@@ -235,24 +232,21 @@ function gamesForTeam(
   return { won, lost };
 }
 
-export function computeStandings(
-  allMatches: Match[],
-  group: Group,
-): TeamStandingRow[] {
+export function computeStandings(allMatches: Match[], group: Group): TeamStandingRow[] {
   const roster = groups[group];
   const total = TOTAL_MATCHES[group];
 
   // Only completed matches with parseable results
   const completedMatches = allMatches.filter(
-    m =>
+    (m) =>
       (m.league_group || 'Group B') === group &&
       m.status === 'Completed' &&
       !!m.result?.trim() &&
-      parseResultString(m.result) !== null,
+      parseResultString(m.result) !== null
   );
 
   const rows: TeamStandingRow[] = roster.map(([teamId, names]) => {
-    const [first, second] = names.split(',').map(n => n.trim());
+    const [first, second] = names.split(',').map((n) => n.trim());
     const players = `${first} & ${second}`;
     const teamLabel = `#${teamId} - ${players}`;
 
@@ -309,8 +303,7 @@ export function computeStandings(
   // Sort by ranking rules
   rows.sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-    if (b.netScoreRate !== a.netScoreRate)
-      return b.netScoreRate - a.netScoreRate;
+    if (b.netScoreRate !== a.netScoreRate) return b.netScoreRate - a.netScoreRate;
     if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
     return Number(a.teamId) - Number(b.teamId);
   });

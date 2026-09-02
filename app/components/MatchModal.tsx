@@ -1,12 +1,5 @@
 import { FormEvent, useState, useEffect } from 'react';
-import {
-  Group,
-  Team,
-  allPlayers,
-  identityValue,
-  teamDisplay,
-  teamNames,
-} from '../teams';
+import { Group, Team, allPlayers, identityValue, teamDisplay, teamNames } from '../teams';
 import { Draft } from '../lib/matches';
 import {
   ScoreEntryState,
@@ -16,9 +9,7 @@ import {
 } from '../lib/scoring';
 import { ScoreEntry } from './ScoreEntry';
 
-const sortedPlayers = [...allPlayers].sort((a, b) =>
-  a.name.localeCompare(b.name),
-);
+const sortedPlayers = [...allPlayers].sort((a, b) => a.name.localeCompare(b.name));
 
 export function IdentityPrompt({
   value,
@@ -41,21 +32,15 @@ export function IdentityPrompt({
       >
         <h2 id="identity-heading">Welcome! Select your player</h2>
         <p>
-          Choose the player you&apos;re scheduling for. You can switch players
-          anytime from the top-right menu.
+          Choose the player you&apos;re scheduling for. You can switch players anytime from the
+          top-right menu.
         </p>
         <label className="field">
           Player
-          <select
-            value={value}
-            onChange={event => onValue(event.target.value)}
-          >
+          <select value={value} onChange={(event) => onValue(event.target.value)}>
             <option value="">Select a player</option>
-            {sortedPlayers.map(player => (
-              <option
-                key={identityValue(player)}
-                value={identityValue(player)}
-              >
+            {sortedPlayers.map((player) => (
+              <option key={identityValue(player)} value={identityValue(player)}>
                 {player.name}
               </option>
             ))}
@@ -102,9 +87,7 @@ export function MatchModal({
   onClose,
   onSubmit,
 }: MatchModalProps) {
-  const [scoreEntry, setScoreEntry] = useState<ScoreEntryState>(
-    blankScoreEntry(),
-  );
+  const [scoreEntry, setScoreEntry] = useState<ScoreEntryState>(blankScoreEntry());
   const [scoreError, setScoreError] = useState('');
 
   // When the modal opens for editing, pre-populate score fields from existing result
@@ -134,8 +117,6 @@ export function MatchModal({
         setScoreError(validation.error);
         return;
       }
-      // Write the result string into draft before parent save handler runs
-      onDraft({ ...draft, result: validation.result });
       setScoreError('');
       onSubmit(e, scoreEntry);
     } else {
@@ -160,7 +141,7 @@ export function MatchModal({
         <div className="fields">
           <label className="field">
             First team
-            <select value={first} onChange={e => onFirst(e.target.value)}>
+            <select value={first} onChange={(e) => onFirst(e.target.value)}>
               {roster
                 .filter(([id]) => id !== second)
                 .map(([id]) => (
@@ -172,7 +153,7 @@ export function MatchModal({
           </label>
           <label className="field">
             Opponent
-            <select value={second} onChange={e => onSecond(e.target.value)}>
+            <select value={second} onChange={(e) => onSecond(e.target.value)}>
               {roster
                 .filter(([id]) => id !== first)
                 .map(([id]) => (
@@ -187,7 +168,7 @@ export function MatchModal({
             <input
               type="date"
               value={draft.match_date}
-              onChange={e => onDraft({ ...draft, match_date: e.target.value })}
+              onChange={(e) => onDraft({ ...draft, match_date: e.target.value })}
             />
           </label>
           <label className="field">
@@ -195,23 +176,20 @@ export function MatchModal({
             <input
               type="time"
               value={draft.match_time}
-              onChange={e => onDraft({ ...draft, match_time: e.target.value })}
+              onChange={(e) => onDraft({ ...draft, match_time: e.target.value })}
             />
           </label>
           <label className="field">
             Court
             <input
               value={draft.court}
-              onChange={e => onDraft({ ...draft, court: e.target.value })}
+              onChange={(e) => onDraft({ ...draft, court: e.target.value })}
             />
           </label>
           <label className="field">
             Status
-            <select
-              value={draft.status}
-              onChange={e => handleStatusChange(e.target.value)}
-            >
-              {['Scheduled', 'Completed', 'Cancelled'].map(status => (
+            <select value={draft.status} onChange={(e) => handleStatusChange(e.target.value)}>
+              {['Scheduled', 'Completed', 'Cancelled'].map((status) => (
                 <option key={status}>{status}</option>
               ))}
             </select>
@@ -223,7 +201,7 @@ export function MatchModal({
               teamBLabel={secondLabel}
               entry={scoreEntry}
               error={scoreError}
-              onChange={next => {
+              onChange={(next) => {
                 setScoreEntry(next);
                 setScoreError('');
               }}
@@ -235,9 +213,7 @@ export function MatchModal({
               Cancellation reason
               <textarea
                 value={draft.cancellation_reason || ''}
-                onChange={e =>
-                  onDraft({ ...draft, cancellation_reason: e.target.value })
-                }
+                onChange={(e) => onDraft({ ...draft, cancellation_reason: e.target.value })}
               />
             </label>
           )}
