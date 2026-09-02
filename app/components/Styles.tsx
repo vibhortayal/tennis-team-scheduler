@@ -184,7 +184,9 @@ export function Styles() {
         font-size:10px;font-weight:800;
         border-radius:999px;letter-spacing:.4px;
         margin-left:4px;text-transform:uppercase;
-      }
+        }
+        .standings-team-cell{flex-wrap:wrap}
+        .standings-team-players{flex-basis:100%;color:#5f7064;font-size:12px;line-height:1.3}        
       .standings-footnote{
         margin:10px 0 0;
         font-size:12px;color:#758278;
