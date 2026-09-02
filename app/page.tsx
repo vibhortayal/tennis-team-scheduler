@@ -84,31 +84,43 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(IDENTITY_KEY);
+  try {
+    const saved = window.localStorage.getItem(IDENTITY_KEY);
 
-      if (!saved) {
-        return;
-      }
-
-      const parsed = JSON.parse(saved) as Identity;
-
-      const savedIdentity = parsed.viewing
-        ? viewingIdentity
-        : allPlayers.find(
-            player =>
-              player.name === parsed.name &&
-              player.teamId === parsed.teamId &&
-              player.group === parsed.group,
-          );
-
-      if (savedIdentity) {
-        setIdentity(savedIdentity);
-      }
-    } catch {
-      setIdentity(viewingIdentity);
+    if (!saved) {
+      return;
     }
-  }, []);
+
+    const parsed = JSON.parse(saved) as Identity;
+
+    const savedIdentity = parsed.viewing
+      ? viewingIdentity
+      : allPlayers.find(
+          player =>
+            player.name === parsed.name &&
+            player.teamId === parsed.teamId &&
+            player.group === parsed.group,
+        );
+
+    if (!savedIdentity) {
+      return;
+    }
+
+    setIdentity(savedIdentity);
+
+    if (savedIdentity.viewing) {
+      setSuggestionTeam('');
+      return;
+    }
+
+    setGroup(savedIdentity.group);
+    setScheduleGroup(savedIdentity.group);
+    setSuggestionTeam(savedIdentity.teamId);
+  } catch {
+    setIdentity(viewingIdentity);
+    setSuggestionTeam('');
+  }
+}, []);
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
