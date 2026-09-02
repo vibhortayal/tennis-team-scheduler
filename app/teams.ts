@@ -19,7 +19,7 @@ export const groups: Record<Group, readonly Team[]> = {
 ['1', 'Dipesh, Vipin'],
 ['3', 'Gaurav, Anish'],
 ['4', 'Amit, Ananth'],
-['6', 'Nissarg, Aniket'],
+['6', 'Nisarg, Aniket'],
 ['8', 'Manikumar, Arindam'],
 ['10', 'Vibhor, Gourav'],
 ['13', 'Manoj, Srinivas'],
