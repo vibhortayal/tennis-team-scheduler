@@ -74,8 +74,8 @@ export function SmartScheduling({
             <div className="suggestion-fields">
               <label className="field">
                 Minimum days after your last match
-                <select value={yourGapDays} onChange={e => onYourGap(Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                <select value={yourGapDays} onChange={(e) => onYourGap(Number(e.target.value))}>
+                  {[1, 2, 3, 4, 5, 6, 7].map((days) => (
                     <option value={days} key={days}>
                       {days} day{days === 1 ? '' : 's'}
                     </option>
@@ -85,8 +85,11 @@ export function SmartScheduling({
 
               <label className="field">
                 Minimum days after opponent&apos;s last match
-                <select value={opponentGapDays} onChange={e => onOpponentGap(Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5, 6, 7].map(days => (
+                <select
+                  value={opponentGapDays}
+                  onChange={(e) => onOpponentGap(Number(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((days) => (
                     <option value={days} key={days}>
                       {days} day{days === 1 ? '' : 's'}
                     </option>
@@ -105,9 +108,9 @@ export function SmartScheduling({
           {suggestions.length > 0 && (
             <label className="field suggestion-filter">
               Filter by opponent
-              <select value={suggestionOpponent} onChange={e => onOpponentFilter(e.target.value)}>
+              <select value={suggestionOpponent} onChange={(e) => onOpponentFilter(e.target.value)}>
                 <option value="">All opponents</option>
-                {opponentOptions.map(id => (
+                {opponentOptions.map((id) => (
                   <option value={id} key={id}>
                     {teamDisplay(scheduleGroup, id)}
                   </option>
@@ -118,7 +121,7 @@ export function SmartScheduling({
 
           {visibleSuggestions.length > 0 && (
             <div className="grid suggestion-grid">
-              {visibleSuggestions.map(suggestion => (
+              {visibleSuggestions.map((suggestion) => (
                 <article
                   className="card suggestion-card"
                   key={`${suggestion.opponentId}-${suggestion.date}`}
@@ -128,7 +131,11 @@ export function SmartScheduling({
                   <div className="matchup">
                     <TeamContext group={scheduleGroup} id={suggestionTeam} matches={matches} />
                     <span className="versus">vs</span>
-                    <TeamContext group={scheduleGroup} id={suggestion.opponentId} matches={matches} />
+                    <TeamContext
+                      group={scheduleGroup}
+                      id={suggestion.opponentId}
+                      matches={matches}
+                    />
                   </div>
 
                   <p>
@@ -142,7 +149,9 @@ export function SmartScheduling({
                     {suggestion.yourGap === 99 ? 'No nearby match' : `${suggestion.yourGap} days`}
                     <br />
                     Opponent rest:{' '}
-                    {suggestion.opponentGap === 99 ? 'No nearby match' : `${suggestion.opponentGap} days`}
+                    {suggestion.opponentGap === 99
+                      ? 'No nearby match'
+                      : `${suggestion.opponentGap} days`}
                   </p>
 
                   <button onClick={() => onSchedule(suggestion)}>Schedule this match</button>

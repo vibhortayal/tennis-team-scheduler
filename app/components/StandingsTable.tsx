@@ -22,8 +22,7 @@ export function StandingsTable({
   if (rows.length === 0) {
     return (
       <p className="empty">
-        No completed matches yet. Standings will appear once results are
-        entered.
+        No completed matches yet. Standings will appear once results are entered.
       </p>
     );
   }
@@ -58,7 +57,7 @@ export function StandingsTable({
           </thead>
 
           <tbody>
-            {rows.map(row => {
+            {rows.map((row) => {
               const qualifying = row.groupRank <= QUALIFYING_POSITIONS;
               const isOwnTeam = selectedTeamId === row.teamId;
               const rowClass = [
@@ -102,9 +101,7 @@ export function StandingsTable({
                     {row.matchesWon}–{row.matchesLost}
                   </td>
 
-                  <td className="standings-num standings-pts">
-                    {row.totalPoints}
-                  </td>
+                  <td className="standings-num standings-pts">{row.totalPoints}</td>
 
                   <td
                     className={`standings-num standings-nsr ${
@@ -126,9 +123,7 @@ export function StandingsTable({
         </table>
       </div>
 
-      <p className="standings-footnote">
-        Ranked by points, then Net Score Rate. Top 4 qualify.
-      </p>
+      <p className="standings-footnote">Ranked by points, then Net Score Rate. Top 4 qualify.</p>
     </div>
   );
 }
@@ -151,7 +146,7 @@ export function StandingsView({
   return (
     <>
       <div className="tabs">
-        {(['Group A', 'Group B'] as Group[]).map(g => (
+        {(['Group A', 'Group B'] as Group[]).map((g) => (
           <button
             key={g}
             className={standingsGroup === g ? 'active' : ''}
@@ -162,11 +157,7 @@ export function StandingsView({
         ))}
       </div>
 
-      <StandingsTable
-        rows={rows}
-        group={standingsGroup}
-        selectedTeamId={selectedTeamId}
-      />
+      <StandingsTable rows={rows} group={standingsGroup} selectedTeamId={selectedTeamId} />
     </>
   );
 }

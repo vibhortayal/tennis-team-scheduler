@@ -70,10 +70,9 @@ export default function Page() {
       return;
     }
 
-    const response = await fetch(
-      `${api}?select=*&order=match_date.asc,match_time.asc`,
-      { headers },
-    );
+    const response = await fetch(`${api}?select=*&order=match_date.asc,match_time.asc`, {
+      headers,
+    });
 
     if (response.ok) {
       setMatches(await response.json());
@@ -84,7 +83,7 @@ export default function Page() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   useEffect(() => {
@@ -100,10 +99,10 @@ export default function Page() {
       const savedIdentity = parsed.viewing
         ? viewingIdentity
         : allPlayers.find(
-            player =>
+            (player) =>
               player.name === parsed.name &&
               player.teamId === parsed.teamId &&
-              player.group === parsed.group,
+              player.group === parsed.group
           );
 
       if (!savedIdentity) {
@@ -158,79 +157,60 @@ export default function Page() {
   const scoped = useMemo(
     () =>
       matches.filter(
-        match =>
+        (match) =>
           (match.league_group || 'Group B') === group &&
           (filter === 'All' || match.status === filter) &&
-          (!team || teamIds(match, group).includes(team)),
+          (!team || teamIds(match, group).includes(team))
       ),
-    [matches, group, filter, team],
+    [matches, group, filter, team]
   );
 
-  const standingsA = useMemo(
-    () => computeStandings(matches, 'Group A'),
-    [matches],
-  );
-  const standingsB = useMemo(
-    () => computeStandings(matches, 'Group B'),
-    [matches],
-  );
+  const standingsA = useMemo(() => computeStandings(matches, 'Group A'), [matches]);
+  const standingsB = useMemo(() => computeStandings(matches, 'Group B'), [matches]);
 
   const opponentOptions = useMemo(
-    () => Array.from(new Set(suggestions.map(item => item.opponentId))),
-    [suggestions],
+    () => Array.from(new Set(suggestions.map((item) => item.opponentId))),
+    [suggestions]
   );
 
   const visibleSuggestions = useMemo(() => {
     const filtered = suggestionOpponent
-      ? suggestions.filter(item => item.opponentId === suggestionOpponent)
+      ? suggestions.filter((item) => item.opponentId === suggestionOpponent)
       : Object.values(
           suggestions.reduce<Record<string, Suggestion>>((best, item) => {
-            if (
-              !best[item.opponentId] ||
-              item.date < best[item.opponentId].date
-            ) {
+            if (!best[item.opponentId] || item.date < best[item.opponentId].date) {
               best[item.opponentId] = item;
             }
 
             return best;
-          }, {}),
+          }, {})
         );
 
     return filtered.sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) ||
-        a.opponentId.localeCompare(b.opponentId),
+      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
     );
   }, [suggestions, suggestionOpponent]);
 
   const nowInFremont = fremontNow();
 
   const overdue = scoped.filter(
-    match =>
-      match.status === 'Scheduled' && matchDateTime(match) < nowInFremont,
+    (match) => match.status === 'Scheduled' && matchDateTime(match) < nowInFremont
   );
 
   const upcoming = scoped.filter(
-    match =>
-      match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont,
+    (match) => match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont
   );
 
-  const completed = scoped.filter(match => match.status === 'Completed');
-  const cancelled = scoped.filter(match => match.status === 'Cancelled');
+  const completed = scoped.filter((match) => match.status === 'Completed');
+  const cancelled = scoped.filter((match) => match.status === 'Cancelled');
 
   const upcomingAll = matches
-    .filter(
-      match =>
-        match.status === 'Scheduled' &&
-        matchDateTime(match) >= nowInFremont,
-    )
+    .filter((match) => match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont)
     .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)));
 
   const nextMatchDate = upcomingAll[0]?.match_date || '';
 
-  const nextMatches = upcomingAll.filter(
-    match => match.match_date === nextMatchDate,
-  );
+  const nextMatches = upcomingAll.filter((match) => match.match_date === nextMatchDate);
 
   /**
    * UI-only eligibility check. It intentionally uses the match's own
@@ -265,9 +245,7 @@ export default function Page() {
     } else {
       setDraft(blank(group));
       setFirst(identity.teamId || roster[0][0]);
-      setSecond(
-        roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0][0],
-      );
+      setSecond(roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0][0]);
     }
 
     setOpen(true);
@@ -285,9 +263,7 @@ export default function Page() {
   };
 
   const continueWithIdentity = () => {
-    const selected = allPlayers.find(
-      player => identityValue(player) === pendingIdentityValue,
-    );
+    const selected = allPlayers.find((player) => identityValue(player) === pendingIdentityValue);
 
     if (!selected) {
       return;
@@ -300,8 +276,7 @@ export default function Page() {
     setFirst(selected.teamId);
 
     setSecond(
-      groups[selected.group].find(([id]) => id !== selected.teamId)?.[0] ||
-        selected.teamId,
+      groups[selected.group].find(([id]) => id !== selected.teamId)?.[0] || selected.teamId
     );
 
     setDraft(blank(selected.group));
@@ -311,9 +286,7 @@ export default function Page() {
 
   const findSuggestions = () => {
     if (identity.viewing || !suggestionTeam) {
-      setSuggestionNote(
-        'Select who you are from the top-right menu first.',
-      );
+      setSuggestionNote('Select who you are from the top-right menu first.');
       setSuggestions([]);
       setSuggestionOpponent('');
       return;
@@ -323,42 +296,22 @@ export default function Page() {
 
     const possibleOpponents = scheduleRoster
       .map(([id]) => id)
-      .filter(id => id !== suggestionTeam)
-      .filter(
-        opponentId =>
-          !existingFixture(
-            matches,
-            scheduleGroup,
-            suggestionTeam,
-            opponentId,
-          ),
-      );
+      .filter((id) => id !== suggestionTeam)
+      .filter((opponentId) => !existingFixture(matches, scheduleGroup, suggestionTeam, opponentId));
 
     const candidates: Suggestion[] = [];
 
     for (const opponentId of possibleOpponents) {
-      const yourMatches = matchesForTeam(
-        matches,
-        scheduleGroup,
-        suggestionTeam,
-      );
+      const yourMatches = matchesForTeam(matches, scheduleGroup, suggestionTeam);
 
-      const opponentMatches = matchesForTeam(
-        matches,
-        scheduleGroup,
-        opponentId,
-      );
+      const opponentMatches = matchesForTeam(matches, scheduleGroup, opponentId);
 
       for (let offset = 1; offset <= 30; offset += 1) {
         const date = addDays(today, offset);
 
-        const youHaveMatch = yourMatches.some(
-          match => match.match_date === date,
-        );
+        const youHaveMatch = yourMatches.some((match) => match.match_date === date);
 
-        const opponentHasMatch = opponentMatches.some(
-          match => match.match_date === date,
-        );
+        const opponentHasMatch = opponentMatches.some((match) => match.match_date === date);
 
         if (youHaveMatch || opponentHasMatch) {
           continue;
@@ -382,9 +335,7 @@ export default function Page() {
     }
 
     const ranked = candidates.sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) ||
-        a.opponentId.localeCompare(b.opponentId),
+      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
     );
 
     setSuggestions(ranked);
@@ -393,25 +344,18 @@ export default function Page() {
     setSuggestionNote(
       ranked.length
         ? 'Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.'
-        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.',
+        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
     );
   };
 
   const scheduleSuggestion = (suggestion: Suggestion) => {
-    if (
-      existingFixture(
-        matches,
-        scheduleGroup,
-        suggestionTeam,
-        suggestion.opponentId,
-      )
-    ) {
+    if (existingFixture(matches, scheduleGroup, suggestionTeam, suggestion.opponentId)) {
       setSuggestionNote(
-        'That matchup is already scheduled or completed, so it cannot be suggested.',
+        'That matchup is already scheduled or completed, so it cannot be suggested.'
       );
 
-      setSuggestions(current =>
-        current.filter(item => item.opponentId !== suggestion.opponentId),
+      setSuggestions((current) =>
+        current.filter((item) => item.opponentId !== suggestion.opponentId)
       );
 
       return;
@@ -462,33 +406,24 @@ export default function Page() {
       return;
     }
 
-    if (
-      draft.status === 'Cancelled' &&
-      !draft.cancellation_reason?.trim()
-    ) {
+    if (draft.status === 'Cancelled' && !draft.cancellation_reason?.trim()) {
       setNote('Enter a cancellation reason.');
       return;
     }
 
-    const matchGroup = editing
-      ? ((editing.league_group || 'Group B') as Group)
-      : group;
+    const matchGroup = editing ? ((editing.league_group || 'Group B') as Group) : group;
 
     const conflict = matches.find(
-      match =>
+      (match) =>
         match.id !== editing?.id &&
         (match.league_group || 'Group B') === matchGroup &&
         match.match_date === draft.match_date &&
         match.status !== 'Cancelled' &&
-        teamIds(match, matchGroup).some(
-          id => id === first || id === second,
-        ),
+        teamIds(match, matchGroup).some((id) => id === first || id === second)
     );
 
     if (conflict) {
-      setNote(
-        'One of these teams already has an active match on that date.',
-      );
+      setNote('One of these teams already has an active match on that date.');
       return;
     }
 
@@ -498,14 +433,11 @@ export default function Page() {
       matchup: `Team #${first} vs Team #${second}`,
     };
 
-    const response = await fetch(
-      editing ? `${api}?id=eq.${editing.id}` : api,
-      {
-        method: editing ? 'PATCH' : 'POST',
-        headers,
-        body: JSON.stringify(body),
-      },
-    );
+    const response = await fetch(editing ? `${api}?id=eq.${editing.id}` : api, {
+      method: editing ? 'PATCH' : 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
     if (!response.ok) {
       setNote('Could not save the match.');
@@ -559,21 +491,16 @@ export default function Page() {
           {nextMatches.length > 0 ? (
             <section className="hero next-matches">
               <div className="wide-hero">
-                <div className="eyebrow">
-                  NEXT MATCH · {dateText(nextMatchDate)}
-                </div>
+                <div className="eyebrow">NEXT MATCH · {dateText(nextMatchDate)}</div>
 
                 <div className="grid">
-                  {nextMatches.map(match => {
-                    const matchGroup = (
-                      match.league_group || 'Group B'
-                    ) as Group;
+                  {nextMatches.map((match) => {
+                    const matchGroup = (match.league_group || 'Group B') as Group;
 
                     return (
                       <article className="card" key={match.id}>
                         <small>
-                          {matchGroup.toUpperCase()} ·{' '}
-                          {match.match_time.slice(0, 5)}
+                          {matchGroup.toUpperCase()} · {match.match_time.slice(0, 5)}
                         </small>
 
                         <Matchup match={match} group={matchGroup} />
@@ -598,7 +525,7 @@ export default function Page() {
           )}
 
           <div className="tabs">
-            {(['Group A', 'Group B'] as Group[]).map(nextGroup => (
+            {(['Group A', 'Group B'] as Group[]).map((nextGroup) => (
               <button
                 className={group === nextGroup ? 'active' : ''}
                 onClick={() => setGroup(nextGroup)}
@@ -614,22 +541,17 @@ export default function Page() {
           </button>
 
           <div className="filters">
-            {['All', 'Scheduled', 'Completed', 'Cancelled'].map(
-              status => (
-                <button
-                  className={filter === status ? 'active' : ''}
-                  onClick={() => setFilter(status)}
-                  key={status}
-                >
-                  {status}
-                </button>
-              ),
-            )}
+            {['All', 'Scheduled', 'Completed', 'Cancelled'].map((status) => (
+              <button
+                className={filter === status ? 'active' : ''}
+                onClick={() => setFilter(status)}
+                key={status}
+              >
+                {status}
+              </button>
+            ))}
 
-            <select
-              value={team}
-              onChange={event => setTeam(event.target.value)}
-            >
+            <select value={team} onChange={(event) => setTeam(event.target.value)}>
               <option value="">All {group} teams</option>
 
               {roster.map(([id]) => (
@@ -648,27 +570,20 @@ export default function Page() {
               </h2>
 
               <p className="overdue-copy">
-                These scheduled match times have passed in Fremont. Update
-                each match as completed with a result, or cancel it with a
-                reason.
+                These scheduled match times have passed in Fremont. Update each match as completed
+                with a result, or cancel it with a reason.
               </p>
 
               <div className="grid">
-                {overdue.map(match => {
+                {overdue.map((match) => {
                   const canUpdate = canUpdateMatch(match);
 
                   return (
-                    <article
-                      className="card overdue-card"
-                      key={match.id}
-                    >
-                      <div className="overdue-badge">
-                        UPDATE REQUIRED
-                      </div>
+                    <article className="card overdue-card" key={match.id}>
+                      <div className="overdue-badge">UPDATE REQUIRED</div>
 
                       <small>
-                        {dateText(match.match_date)} ·{' '}
-                        {match.match_time.slice(0, 5)} ·{' '}
+                        {dateText(match.match_date)} · {match.match_time.slice(0, 5)} ·{' '}
                         <b>Scheduled</b>
                       </small>
 
@@ -694,9 +609,7 @@ export default function Page() {
                       </button>
 
                       {!canUpdate && (
-                        <p className="permission-note">
-                          Only players on this match can update it.
-                        </p>
+                        <p className="permission-note">Only players on this match can update it.</p>
                       )}
                     </article>
                   );
