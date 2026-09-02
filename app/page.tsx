@@ -201,25 +201,27 @@ export default function Page() {
   }, [suggestions, suggestionOpponent]);
 
   const nowInFremont = fremontNow();
+  const todayInFremont = currentDateInFremont();
 
   const overdue = scoped.filter(
     (match) => match.status === 'Scheduled' && matchDateTime(match) < nowInFremont
   );
 
   const upcoming = scoped.filter(
-    (match) => match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont
+    (match) => match.status === 'Scheduled' && match.match_date >= todayInFremont
   );
 
   const completed = scoped.filter((match) => match.status === 'Completed');
   const cancelled = scoped.filter((match) => match.status === 'Cancelled');
 
   const upcomingAll = matches
-    .filter((match) => match.status === 'Scheduled' && matchDateTime(match) >= nowInFremont)
+    .filter((match) => match.status === 'Scheduled' && match.match_date >= todayInFremont)
     .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b)));
 
   const nextMatchDate = upcomingAll[0]?.match_date || '';
 
   const nextMatches = upcomingAll.filter((match) => match.match_date === nextMatchDate);
+  const hasTodayMatches = upcoming.some((match) => match.match_date === todayInFremont);
 
   const begin = (match?: Match) => {
     if (match && !canUpdateMatch(match, identity)) {
@@ -626,7 +628,7 @@ export default function Page() {
           )}
 
           <Section
-            title="Upcoming matches"
+            title={hasTodayMatches ? "Today's matches" : 'Upcoming matches'}
             list={upcoming}
             edit={begin}
             empty="No upcoming matches."
