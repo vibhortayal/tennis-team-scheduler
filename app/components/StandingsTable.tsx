@@ -86,6 +86,7 @@ export function StandingsTable({
 
                   <td className="standings-team-cell">
                     <span className="team-number">#{row.teamId}</span>
+                    <span className="standings-team-players">{row.players}</span>
                     {isOwnTeam && (
                       <span className="standings-you" aria-label="Your team">
                         YOU
