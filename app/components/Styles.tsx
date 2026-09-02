@@ -80,6 +80,13 @@ export function Styles() {
       .suggestions-panel{margin:6px 0 24px;padding:20px;border:1px solid #cbdccd;border-radius:16px;background:linear-gradient(120deg,#ffffff,#edf8ef)}
       .suggestions-panel h2{margin:5px 0 8px}
       .suggestions-panel p{color:#5f7064}
+      .personal-header{display:flex;align-items:center;gap:12px}
+      .personal-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#147a42;color:#fff;font-size:14px;font-weight:800;letter-spacing:.5px;flex-shrink:0}
+      .personal-summary{margin:0 0 16px;padding:12px 14px;border-left:3px solid #147a42;background:#f1f7f1}
+      .personal-summary p{margin:0 0 9px}
+      .personal-stats{display:flex;gap:8px;flex-wrap:wrap}
+      .personal-stats span{padding:6px 9px;border-radius:999px;background:#fff;color:#47614d;font-size:12px}
+      .personal-stats b{color:#17663d}
       .suggestion-step{margin-top:18px}
       .suggestion-step h3{margin:0 0 8px;font-size:14px}
       .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
@@ -93,6 +100,25 @@ export function Styles() {
       .suggestion-card{border-color:#c3dac8;background:#ffffff}
       .suggestion-card > small{color:#147a42;font-weight:800;letter-spacing:.7px}
       .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
+      .availability-manager{margin-top:18px;padding-top:18px;border-top:1px solid #d6dfd5}
+      .availability-manager h3{margin:0 0 6px}
+      .availability-manager > p{font-size:13px;margin:0 0 12px}
+      .availability-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+      .availability-modes{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
+      .availability-modes button{min-height:36px;padding:7px 10px;font-size:12px}
+      .availability-modes .block-mode,.block-mode{background:#c63d1c;color:#fff}
+      .recurring-form{grid-template-columns:1fr 1fr 2fr 1fr 1fr auto}
+      .day-picker > div{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:44px}
+      .day-picker label{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:400}
+      .day-picker input{min-height:auto}
+      .availability-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
+      .availability-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;font-size:13px}
+      .availability-actions{display:flex;gap:6px;flex-shrink:0}
+      .availability-actions button,.readiness-card button{min-height:36px;padding:7px 10px;font-size:12px}
+      .readiness-card{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;border-radius:10px;background:#eaf4eb;color:#17663d;font-size:13px;line-height:1.45}
+      .readiness-card button{margin-left:auto}
+      .readiness-warning{background:#fff3ed;color:#8c351f}
+      .error-note{color:#a72c11 !important;font-size:13px;font-weight:700}
 
       /* === Score entry === */
       .score-entry{
@@ -205,6 +231,7 @@ export function Styles() {
         .tabs::-webkit-scrollbar{display:none}
         .tabs button{flex:0 0 auto;min-width:max-content}
         .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
+        .availability-form{grid-template-columns:1fr}
         .wide{grid-column:auto}
         .hero{display:block}
         .badge{display:inline-block;margin-top:12px}
@@ -220,6 +247,9 @@ export function Styles() {
         .set-row{grid-template-columns:44px 1fr}
         .score-input{width:46px}
         .set-team-name{max-width:60px}
+        .availability-list li{align-items:flex-start;flex-direction:column}
+        .availability-actions{width:100%}
+        .availability-actions button{flex:1}
       }
     `}</style>
   );

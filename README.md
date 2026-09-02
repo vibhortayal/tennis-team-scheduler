@@ -57,7 +57,7 @@ npm run format:fix # Apply Prettier formatting
 
 The frontend currently uses the `dashboard_matches` REST endpoint and does not call the proposal RPCs. Migration `001_initial.sql` creates the earlier proposal-oriented tables (`fixtures`, `match_proposals`, participants, responses, and notifications). Migration `002_standings_trigger.sql` defines the standings trigger for `dashboard_matches` and `team_standings`, but those dashboard tables are not created by the current migrations.
 
-Before applying migration 002, provide the dashboard tables and their required permissions in Supabase. Treat the current player picker as a UI convenience only: it stores the selected identity in local storage and is not authentication or authorization. A production deployment must add Supabase Auth and enforce team membership and match-update permissions with RLS or server-side mutations.
+Before applying migration 002, provide the dashboard tables and their required permissions in Supabase. This is an honor-based tournament: the player picker stores the selected roster identity in local storage, and availability is intentionally public so participants can coordinate without accounts.
 
 ## Roster
 

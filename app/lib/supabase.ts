@@ -1,18 +1,20 @@
 const key =
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-'';
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
 
 export const api = process.env.NEXT_PUBLIC_SUPABASE_URL
-? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dashboard_matches`
-: '';
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dashboard_matches`
+  : '';
+export const availabilityApi = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/player_availability`
+  : '';
 
 export const supabaseKey = key;
 
 export const headers = {
-'Content-Type': 'application/json',
-apikey: key,
-Authorization: `Bearer ${key}`,
-Prefer: 'return=representation',
+  'Content-Type': 'application/json',
+  apikey: key,
+  Authorization: `Bearer ${key}`,
+  Prefer: 'return=representation',
 };
-

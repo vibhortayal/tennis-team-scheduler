@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Group,
   Identity,
@@ -18,14 +18,26 @@ import {
   fremontNow,
   matchDateTime,
   currentDateInFremont,
-  addDays,
   teamIds,
+  matchIncludesTeam,
   canUpdateMatch,
   existingFixture,
   matchesForTeam,
   restGapAroundDate,
 } from './lib/matches';
-import { api, supabaseKey as key, headers } from './lib/supabase';
+import { api, availabilityApi, supabaseKey as key, headers } from './lib/supabase';
+import {
+  AvailabilitySlot,
+  DEFAULT_MATCH_DURATION_MINUTES,
+  SEASON_DEADLINE,
+  generateSuggestedStarts,
+  intersectTimeWindows,
+  isEligibleForSuggestion,
+  mergeAvailabilitySlots,
+  playerKeysForTeam,
+  rankMatchSuggestions,
+  subtractTimeWindow,
+} from './lib/scheduling';
 import { computeStandings, ScoreEntryState, validateScores } from './lib/scoring';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
@@ -59,9 +71,22 @@ export default function Page() {
   const [suggestionNote, setSuggestionNote] = useState('');
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
   const [identity, setIdentity] = useState<Identity>(viewingIdentity);
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [allAvailability, setAllAvailability] = useState<AvailabilitySlot[]>([]);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
 
   const roster = groups[group];
   const scheduleRoster = groups[scheduleGroup];
+  const partnerName =
+    scheduleRoster
+      .find(([id]) => id === suggestionTeam)?.[1]
+      .split(',')
+      .map((name) => name.trim())
+      .find((name) => name !== identity.name) || 'Your partner';
+  const partnerReady = allAvailability.some(
+    (slot) => slot.playerId === `${scheduleGroup}:${suggestionTeam}:${partnerName}`
+  );
 
   const load = async () => {
     if (!api || !key) {
@@ -82,6 +107,49 @@ export default function Page() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  const loadAvailability = useCallback(async (player: Identity) => {
+    if (player.viewing || !availabilityApi || !key) {
+      setAvailability([]);
+      setAllAvailability([]);
+      return;
+    }
+    try {
+      const playerKey = encodeURIComponent(identityValue(player));
+      const playerKeys = groups[player.group].flatMap(([teamId]) =>
+        playerKeysForTeam(player.group, teamId)
+      );
+      const rosterFilter = playerKeys
+        .map((playerKey) => `player_key.eq.${encodeURIComponent(playerKey)}`)
+        .join(',');
+      const response = await fetch(
+        `${availabilityApi}?or=(${rosterFilter})&select=*&order=starts_at.asc`,
+        { headers }
+      );
+      if (!response.ok) throw new Error('Could not load availability.');
+      const rows = (await response.json()) as Array<{
+        id: string;
+        player_key: string;
+        starts_at: string;
+        ends_at: string;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      const parsed = rows.map((row) => ({
+        id: row.id,
+        playerId: row.player_key,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+      setAllAvailability(parsed);
+      setAvailability(parsed.filter((slot) => slot.playerId === decodeURIComponent(playerKey)));
+      setAvailabilityError('');
+    } catch {
+      setAvailabilityError('Could not load your availability.');
+    }
   }, []);
 
   useEffect(() => {
@@ -108,6 +176,7 @@ export default function Page() {
       }
 
       setIdentity(savedIdentity);
+      loadAvailability(savedIdentity);
 
       if (savedIdentity.viewing) {
         setGroup('Group A');
@@ -128,7 +197,7 @@ export default function Page() {
       setStandingsGroup('Group A');
       setSuggestionTeam('');
     }
-  }, []);
+  }, [loadAvailability]);
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
@@ -137,8 +206,10 @@ export default function Page() {
     setSuggestions([]);
     setSuggestionNote('');
     setSuggestionOpponent('');
+    loadAvailability(nextIdentity);
 
     if (!nextIdentity.viewing) {
+      setView('scheduling');
       setGroup(nextIdentity.group);
       setScheduleGroup(nextIdentity.group);
       setStandingsGroup(nextIdentity.group);
@@ -148,6 +219,85 @@ export default function Page() {
       setScheduleGroup('Group A');
       setStandingsGroup('Group A');
       setSuggestionTeam('');
+    }
+  };
+
+  const saveAvailability = async (startsAt: string, endsAt: string, id?: string) => {
+    if (identity.viewing || !availabilityApi || !key) return;
+    setAvailabilitySaving(true);
+    setAvailabilityError('');
+    try {
+      const body = { player_key: identityValue(identity), starts_at: startsAt, ends_at: endsAt };
+      const response = await fetch(id ? `${availabilityApi}?id=eq.${id}` : availabilityApi, {
+        method: id ? 'PATCH' : 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error('Could not save availability.');
+      await loadAvailability(identity);
+    } catch {
+      setAvailabilityError('Could not save your availability.');
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  };
+
+  const deleteAvailability = async (id: string) => {
+    if (!availabilityApi || !key) return;
+    setAvailabilitySaving(true);
+    try {
+      const response = await fetch(`${availabilityApi}?id=eq.${id}`, { method: 'DELETE', headers });
+      if (!response.ok) throw new Error('Could not remove availability.');
+      setAvailability((current) => current.filter((slot) => slot.id !== id));
+    } catch {
+      setAvailabilityError('Could not remove that availability window.');
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  };
+
+  const saveAvailabilityWindows = async (windows: Array<{ startsAt: string; endsAt: string }>) => {
+    for (const window of windows) await saveAvailability(window.startsAt, window.endsAt);
+  };
+
+  const blockAvailability = async (startsAt: string, endsAt: string) => {
+    if (!availabilityApi || !key) return;
+    setAvailabilitySaving(true);
+    setAvailabilityError('');
+    try {
+      const blocked = { startsAt: new Date(startsAt), endsAt: new Date(endsAt) };
+      const affected = availability.filter((slot) => {
+        const window = { startsAt: new Date(slot.startsAt), endsAt: new Date(slot.endsAt) };
+        return blocked.startsAt < window.endsAt && blocked.endsAt > window.startsAt;
+      });
+      for (const slot of affected) {
+        const response = await fetch(`${availabilityApi}?id=eq.${slot.id}`, {
+          method: 'DELETE',
+          headers,
+        });
+        if (!response.ok) throw new Error('Could not block availability.');
+        const pieces = subtractTimeWindow(
+          { startsAt: new Date(slot.startsAt), endsAt: new Date(slot.endsAt) },
+          blocked
+        );
+        for (const piece of pieces) {
+          const response = await fetch(availabilityApi, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              player_key: identityValue(identity),
+              starts_at: piece.startsAt.toISOString(),
+              ends_at: piece.endsAt.toISOString(),
+            }),
+          });
+          if (!response.ok) throw new Error('Could not restore availability around blocked time.');
+        }
+      }
+      await loadAvailability(identity);
+    } catch {
+      setAvailabilityError('Could not block that time.');
+    } finally {
+      setAvailabilitySaving(false);
     }
   };
 
@@ -291,7 +441,18 @@ export default function Page() {
       return;
     }
 
-    const today = currentDateInFremont();
+    if (!availability.length) {
+      setSuggestionNote('Add your availability to unlock match suggestions before September 30.');
+      setSuggestions([]);
+      return;
+    }
+
+    const today = new Date();
+    const deadline = new Date(SEASON_DEADLINE);
+    const slotMap = new Map<string, AvailabilitySlot[]>();
+    allAvailability.forEach((slot) =>
+      slotMap.set(slot.playerId, [...(slotMap.get(slot.playerId) || []), slot])
+    );
 
     const possibleOpponents = scheduleRoster
       .map(([id]) => id)
@@ -307,45 +468,76 @@ export default function Page() {
     for (const opponentId of possibleOpponents) {
       const opponentMatches = teamMatches.get(opponentId) || [];
 
-      for (let offset = 1; offset <= 30; offset += 1) {
-        const date = addDays(today, offset);
+      const participants = [
+        ...playerKeysForTeam(scheduleGroup, suggestionTeam),
+        ...playerKeysForTeam(scheduleGroup, opponentId),
+      ];
+      const windows = intersectTimeWindows(
+        participants.map((player) => mergeAvailabilitySlots(slotMap.get(player) || []))
+      );
+      const starts = windows
+        .flatMap((window) => generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES))
+        .filter(
+          (start) =>
+            start > today &&
+            new Date(start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000) <= deadline
+        )
+        .slice(0, 4);
+      const fixture: Match = {
+        id: `suggested-${suggestionTeam}-${opponentId}`,
+        matchup: `Team #${suggestionTeam} vs Team #${opponentId}`,
+        match_date: '',
+        match_time: '',
+        court: '',
+        status: 'unscheduled',
+        league_group: scheduleGroup,
+      };
+      if (!isEligibleForSuggestion(fixture)) continue;
+      starts.forEach((start) => {
+        const date = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(start);
 
         const youHaveMatch = yourMatches.some((match) => match.match_date === date);
 
         const opponentHasMatch = opponentMatches.some((match) => match.match_date === date);
 
         if (youHaveMatch || opponentHasMatch) {
-          continue;
+          return;
         }
 
         const yourGap = restGapAroundDate(yourMatches, date);
         const opponentGap = restGapAroundDate(opponentMatches, date);
 
         if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
-          continue;
+          return;
         }
 
         candidates.push({
           opponentId,
           date,
+          startsAt: start.toISOString(),
+          endsAt: new Date(start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000).toISOString(),
+          alternateCount: Math.max(0, starts.length - 1),
           yourGap,
           opponentGap,
           score: yourGap + opponentGap,
         });
-      }
+      });
     }
 
-    const ranked = candidates.sort(
-      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
-    );
+    const ranked = rankMatchSuggestions(candidates);
 
     setSuggestions(ranked);
     setSuggestionOpponent('');
 
     setSuggestionNote(
       ranked.length
-        ? 'Found suggested matches, sorted by date. Rest days count completed matches and scheduled upcoming matches.'
-        : 'No suitable matches found in the next 30 days. Rest days count completed matches and scheduled upcoming matches.'
+        ? `We found ${ranked.length} suggested match times before September 30.`
+        : 'No shared time is available yet. Add more time windows before September 30 to improve your options.'
     );
   };
 
@@ -370,13 +562,33 @@ export default function Page() {
     setDraft({
       ...blank(scheduleGroup),
       match_date: suggestion.date,
-      match_time: '19:00',
+      match_time: suggestion.startsAt
+        ? new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'America/Los_Angeles',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+          }).format(new Date(suggestion.startsAt))
+        : '19:00',
       court: 'Court 2',
       league_group: scheduleGroup,
     });
 
     setOpen(true);
     setNote('');
+  };
+
+  const copyReminder = async () => {
+    const partner =
+      groups[scheduleGroup]
+        .find(([id]) => id === suggestionTeam)?.[1]
+        .split(',')
+        .map((name) => name.trim())
+        .find((name) => name !== identity.name) || 'your partner';
+    await navigator.clipboard?.writeText(
+      `Hi ${partner} - I added my availability for our remaining league matches. Please add a few times you can play before September 30 so the scheduler can find overlaps with our opponents.`
+    );
+    setSuggestionNote(`Reminder copied for ${partner}.`);
   };
 
   const save = async (event: FormEvent, scores: ScoreEntryState) => {
@@ -544,6 +756,24 @@ export default function Page() {
           onFind={findSuggestions}
           onOpponentFilter={setSuggestionOpponent}
           onSchedule={scheduleSuggestion}
+          availability={availability}
+          availabilitySaving={availabilitySaving}
+          availabilityError={availabilityError}
+          onAvailabilitySave={saveAvailability}
+          onAvailabilityDelete={deleteAvailability}
+          onAvailabilityBulkSave={saveAvailabilityWindows}
+          onAvailabilityBlock={blockAvailability}
+          copyReminder={copyReminder}
+          partnerName={partnerName}
+          partnerReady={partnerReady}
+          remainingMatchCount={
+            matches.filter(
+              (match) =>
+                (match.league_group || 'Group B') === scheduleGroup &&
+                matchIncludesTeam(match.matchup, suggestionTeam) &&
+                !['Completed', 'Cancelled'].includes(match.status)
+            ).length
+          }
         />
       )}
 
