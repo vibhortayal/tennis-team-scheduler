@@ -42,8 +42,11 @@ export function StandingsTable({
               <th scope="col" title="Matches played">
                 Played
               </th>
-              <th scope="col" title="Wins – Losses">
-                W–L
+              <th scope="col" title="Matches won">
+                Won
+              </th>
+              <th scope="col" title="Matches lost">
+                Lost
               </th>
               <th scope="col" title="Standing points">
                 Pts
@@ -98,9 +101,9 @@ export function StandingsTable({
 
                   <td className="standings-num">{row.matchesPlayed}</td>
 
-                  <td className="standings-num">
-                    {row.matchesWon}–{row.matchesLost}
-                  </td>
+                  <td className="standings-num">{row.matchesWon}</td>
+
+                  <td className="standings-num">{row.matchesLost}</td>
 
                   <td className="standings-num standings-pts">
                     {row.totalPoints}
