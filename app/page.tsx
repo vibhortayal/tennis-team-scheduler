@@ -39,15 +39,15 @@ type View = 'dashboard' | 'scheduling' | 'standings';
 
 export default function Page() {
   const [view, setView] = useState<View>('dashboard');
-  const [group, setGroup] = useState<Group>('Group B');
-  const [scheduleGroup, setScheduleGroup] = useState<Group>('Group B');
-  const [standingsGroup, setStandingsGroup] = useState<Group>('Group B');
+  const [group, setGroup] = useState<Group>('Group A');
+  const [scheduleGroup, setScheduleGroup] = useState<Group>('Group A');
+  const [standingsGroup, setStandingsGroup] = useState<Group>('Group A');
   const [matches, setMatches] = useState<Match[]>([]);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
-  const [draft, setDraft] = useState<Draft>(blank('Group B'));
+  const [draft, setDraft] = useState<Draft>(blank('Group A'));
   const [editing, setEditing] = useState<Match | null>(null);
   const [open, setOpen] = useState(false);
   const [identityPromptOpen, setIdentityPromptOpen] = useState(false);
@@ -111,6 +111,9 @@ export default function Page() {
       setIdentity(savedIdentity);
 
       if (savedIdentity.viewing) {
+        setGroup('Group A');
+        setScheduleGroup('Group A');
+        setStandingsGroup('Group A');
         setSuggestionTeam('');
         return;
       }
@@ -121,6 +124,9 @@ export default function Page() {
       setSuggestionTeam(savedIdentity.teamId);
     } catch {
       setIdentity(viewingIdentity);
+      setGroup('Group A');
+      setScheduleGroup('Group A');
+      setStandingsGroup('Group A');
       setSuggestionTeam('');
     }
   }, []);
@@ -139,6 +145,9 @@ export default function Page() {
       setStandingsGroup(nextIdentity.group);
       setSuggestionTeam(nextIdentity.teamId);
     } else {
+      setGroup('Group A');
+      setScheduleGroup('Group A');
+      setStandingsGroup('Group A');
       setSuggestionTeam('');
     }
   };
