@@ -7,6 +7,7 @@ import {
   getAvailabilityDateState,
   getBlockingDateState,
   getMatchDates,
+  normalizeDate,
   getPlayableTimeWindows,
   hasOverlappingWindows,
   isWeekend,
@@ -193,4 +194,9 @@ test('non-overlapping availability/blocked windows on the same date are allowed'
   ]);
   const result = validateAvailabilityBlockingConflict('2026-09-12', availabilityMap, blockingMap);
   assert.equal(result.valid, true);
+});
+
+test('normalizeDate keeps the local day when reading ISO timestamps from saved evening slots', () => {
+  const localEvening = new Date(2026, 8, 12, 18, 0, 0);
+  assert.equal(normalizeDate(localEvening.toISOString()), normalizeDate(localEvening));
 });
