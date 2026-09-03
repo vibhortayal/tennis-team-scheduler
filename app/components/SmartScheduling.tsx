@@ -344,7 +344,6 @@ export function SmartScheduling({
                     )}
 
                     <button
-                      disabled={!suggestion.allPlayersReady}
                       onClick={() => onSchedule(suggestion)}
                       title={
                         suggestion.allPlayersReady
