@@ -45,6 +45,7 @@ import { IdentityPrompt, MatchModal } from './components/MatchModal';
 import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
+import { DateParticipantStatus } from './components/MultiDateCalendar';
 
 type View = 'dashboard' | 'scheduling' | 'standings';
 
@@ -70,6 +71,7 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionNote, setSuggestionNote] = useState('');
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
+  const [availabilityOpponents, setAvailabilityOpponents] = useState<string[]>([]);
   const [identity, setIdentity] = useState<Identity>(viewingIdentity);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [allAvailability, setAllAvailability] = useState<AvailabilitySlot[]>([]);
@@ -101,7 +103,6 @@ export default function Page() {
     () => matchesForTeam(matches, scheduleGroup, suggestionTeam),
     [matches, scheduleGroup, suggestionTeam]
   );
-
   const load = async () => {
     if (!api || !key) {
       setNote('Missing Supabase public environment settings.');
@@ -224,6 +225,7 @@ export default function Page() {
     setSuggestions([]);
     setSuggestionNote('');
     setSuggestionOpponent('');
+    setAvailabilityOpponents([]);
     loadAvailability(nextIdentity);
 
     if (!nextIdentity.viewing) {
@@ -318,6 +320,53 @@ export default function Page() {
     () => pendingOpponentsForTeam(matches, scheduleGroup, suggestionTeam),
     [matches, scheduleGroup, suggestionTeam]
   );
+  const opponentMissingNames = pendingOpponentIds.flatMap((opponentId) => {
+    const team = groups[scheduleGroup].find(([id]) => id === opponentId);
+    if (!team) return [];
+    return team[1]
+      .split(',')
+      .map((name) => name.trim())
+      .filter(
+        (name) =>
+          !allAvailability.some(
+            (slot) => slot.playerId === `${scheduleGroup}:${opponentId}:${name}`
+          )
+      );
+  });
+  const participantStatusMap = (() => {
+    const participantTeams = [suggestionTeam, ...availabilityOpponents].filter(Boolean);
+    const participants = participantTeams.flatMap((teamId) => {
+      const team = groups[scheduleGroup].find(([id]) => id === teamId);
+      return team
+        ? team[1].split(',').map((name) => ({
+            key: `${scheduleGroup}:${teamId}:${name.trim()}`,
+            name: name.trim(),
+          }))
+        : [];
+    });
+    const dates = new Set<string>();
+    allAvailability.forEach((slot) => {
+      if (participants.some((participant) => participant.key === slot.playerId)) {
+        dates.add(slot.startsAt.slice(0, 10));
+      }
+    });
+    const map = new Map<string, DateParticipantStatus>();
+    dates.forEach((date) => {
+      const status: DateParticipantStatus = { available: [], blocked: [], missing: [] };
+      participants.forEach((participant) => {
+        const slots = allAvailability.filter(
+          (slot) => slot.playerId === participant.key && slot.startsAt.slice(0, 10) === date
+        );
+        const hasAvailable = slots.some((slot) => (slot.kind ?? 'available') === 'available');
+        const hasBlocked = slots.some((slot) => (slot.kind ?? 'available') === 'blocked');
+        if (hasAvailable) status.available.push(participant.name);
+        if (hasBlocked) status.blocked.push(participant.name);
+        if (!hasAvailable && !hasBlocked) status.missing.push(participant.name);
+      });
+      map.set(date, status);
+    });
+    return map;
+  })();
 
   const opponentOptions = useMemo(
     () => Array.from(new Set(suggestions.map((item) => item.opponentId))),
@@ -355,19 +404,6 @@ export default function Page() {
       cancelled: scoped.filter((match) => match.status === 'Cancelled'),
     };
   }, [nowInFremont, scoped, todayInFremont]);
-
-  const upcomingAll = useMemo(
-    () =>
-      matches
-        .filter((match) => match.status === 'Scheduled' && match.match_date >= todayInFremont)
-        .sort((a, b) => matchDateTime(a).localeCompare(matchDateTime(b))),
-    [matches, todayInFremont]
-  );
-
-  const nextMatchDate = upcomingAll[0]?.match_date || '';
-
-  const nextMatches = upcomingAll.filter((match) => match.match_date === nextMatchDate);
-  const hasTodayMatches = upcoming.some((match) => match.match_date === todayInFremont);
 
   const begin = (match?: Match) => {
     if (match && !canUpdateMatch(match, identity)) {
@@ -703,6 +739,10 @@ export default function Page() {
           <b>🎾 Innovation Tennis Open</b>
         </div>
 
+        <button className="group-schedule" onClick={startScheduling}>
+          Schedule match
+        </button>
+
         <PlayerPicker identity={identity} onChange={chooseIdentity} />
       </header>
 
@@ -733,19 +773,15 @@ export default function Page() {
 
       {view === 'dashboard' ? (
         <Dashboard
-          nextMatches={nextMatches}
-          nextMatchDate={nextMatchDate}
           overdue={overdue}
           upcoming={upcoming}
           completed={completed}
           cancelled={cancelled}
-          hasTodayMatches={hasTodayMatches}
           group={group}
           filter={filter}
           team={team}
           identity={identity}
           onGroupChange={setGroup}
-          onSchedule={startScheduling}
           onFilterChange={setFilter}
           onTeamChange={setTeam}
           onEdit={begin}
@@ -779,6 +815,7 @@ export default function Page() {
           availabilitySlots={availabilitySlots}
           blockingSlots={blockingSlots}
           teamMatches={teamMatches}
+          participantStatusMap={participantStatusMap}
           availabilitySaving={availabilitySaving}
           availabilityError={availabilityError}
           onSaveSlot={saveSlot}
@@ -789,6 +826,15 @@ export default function Page() {
           partnerReady={partnerReady}
           pendingMatchCount={pendingOpponentIds.length}
           pendingOpponentIds={pendingOpponentIds}
+          opponentMissingNames={opponentMissingNames}
+          availabilityOpponents={availabilityOpponents}
+          onAvailabilityOpponentToggle={(opponentId) =>
+            setAvailabilityOpponents((current) =>
+              current.includes(opponentId)
+                ? current.filter((id) => id !== opponentId)
+                : [...current, opponentId]
+            )
+          }
         />
       )}
 

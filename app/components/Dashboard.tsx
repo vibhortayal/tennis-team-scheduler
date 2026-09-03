@@ -1,61 +1,60 @@
 import { Group, Identity, groups, teamDisplay } from '../teams';
-import { Match, dateText, canUpdateMatch, teamIds } from '../lib/matches';
+import { Match, dateText, canUpdateMatch, currentDateInFremont, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
 
 type DashboardProps = {
-  nextMatches: Match[];
-  nextMatchDate: string;
   overdue: Match[];
   upcoming: Match[];
   completed: Match[];
   cancelled: Match[];
-  hasTodayMatches: boolean;
   group: Group;
   filter: string;
   team: string;
   identity: Identity;
   onGroupChange: (group: Group) => void;
-  onSchedule: () => void;
   onFilterChange: (filter: string) => void;
   onTeamChange: (team: string) => void;
   onEdit: (match: Match) => void;
 };
 
 export function Dashboard({
-  nextMatches,
-  nextMatchDate,
   overdue,
   upcoming,
   completed,
   cancelled,
-  hasTodayMatches,
   group,
   filter,
   team,
   identity,
   onGroupChange,
-  onSchedule,
   onFilterChange,
   onTeamChange,
   onEdit,
 }: DashboardProps) {
   const roster = groups[group];
-  const filteredNextMatches = nextMatches.filter(
+  const filteredUpcoming = upcoming.filter(
     (match) =>
       (filter === 'All' || match.status === filter) &&
       (!team || teamIds(match, group).includes(team))
   );
+  const today = currentDateInFremont();
+  const featuredMatch =
+    filteredUpcoming.find((match) => match.match_date === today) || filteredUpcoming[0];
   const showNextMatches = filter === 'All' || filter === 'Scheduled';
 
   return (
     <>
-      {showNextMatches && filteredNextMatches.length > 0 ? (
+      {showNextMatches && featuredMatch ? (
         <section className="hero next-matches">
           <div className="wide-hero">
-            <div className="eyebrow">NEXT MATCH · {dateText(nextMatchDate)}</div>
+            <div className="eyebrow">
+              {featuredMatch.match_date === today ? "TODAY'S MATCH" : 'NEXT MATCH'} ·{' '}
+              {dateText(featuredMatch.match_date)}
+            </div>
 
             <div className="grid">
-              {filteredNextMatches.map((match) => {
+              {(() => {
+                const match = featuredMatch;
                 const matchGroup = (match.league_group || 'Group B') as Group;
 
                 return (
@@ -69,7 +68,7 @@ export function Dashboard({
                     <p>{match.court}</p>
                   </article>
                 );
-              })}
+              })()}
             </div>
           </div>
         </section>
@@ -96,10 +95,6 @@ export function Dashboard({
           </button>
         ))}
       </div>
-
-      <button className="group-schedule" onClick={onSchedule}>
-        Schedule match
-      </button>
 
       <div className="filters">
         {['All', 'Scheduled', 'Completed', 'Cancelled'].map((status) => (
@@ -179,8 +174,8 @@ export function Dashboard({
       )}
 
       <Section
-        title={hasTodayMatches ? "Today's matches" : 'Upcoming matches'}
-        list={upcoming}
+        title="Upcoming matches"
+        list={filteredUpcoming}
         edit={onEdit}
         empty="No upcoming matches."
         group={group}

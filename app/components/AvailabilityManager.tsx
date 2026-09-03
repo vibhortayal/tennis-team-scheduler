@@ -16,7 +16,7 @@ import {
   DayBlock,
   PickerType,
 } from '../lib/availabilityHelpers';
-import { MultiDateCalendar, DateStateLegend } from './MultiDateCalendar';
+import { DateParticipantStatus, MultiDateCalendar, DateStateLegend } from './MultiDateCalendar';
 import { SelectedDayChips, SelectedDayChipEntry } from './SelectedDayChips';
 import { DayModeSelector } from './DayModeSelector';
 import { TimeWindowSelector } from './TimeWindowSelector';
@@ -34,6 +34,8 @@ type AvailabilityManagerProps = {
   availabilitySlots: AvailabilitySlot[];
   blockingSlots: AvailabilitySlot[];
   teamMatches: Match[];
+  participantStatusMap: Map<DateString, DateParticipantStatus>;
+  readOnly?: boolean;
   deadline: string;
   saving: boolean;
   error: string;
@@ -48,6 +50,8 @@ export function AvailabilityManager({
   availabilitySlots,
   blockingSlots,
   teamMatches,
+  participantStatusMap,
+  readOnly = false,
   deadline,
   saving,
   error,
@@ -93,37 +97,42 @@ export function AvailabilityManager({
   };
 
   return (
-    <div className="availability-manager">
-      <h3>Availability &amp; blocking</h3>
+    <div className={`availability-manager ${readOnly ? 'read-only' : ''}`}>
+      <h3>{readOnly ? 'Team availability' : 'Availability & blocking'}</h3>
       <p>
-        Pick dates on the calendar, choose &quot;anytime&quot; or specific time windows, then save.
-        Match days are locked automatically and the two calendars stay in sync with each other.
+        {readOnly
+          ? 'Review availability for the selected matchup teams on the calendar.'
+          : 'Pick dates on the calendar, choose &quot;anytime&quot; or specific time windows, then save. Match days are locked automatically and the two calendars stay in sync with each other.'}
       </p>
       {error && <p className="error-note">{error}</p>}
-      <div className="availability-modes" role="tablist" aria-label="Availability action">
-        <button
-          type="button"
-          className={activeTab === 'availability' ? '' : 'secondary'}
-          onClick={() => setActiveTab('availability')}
-        >
-          Available dates
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'blocking' ? 'block-mode' : 'secondary'}
-          onClick={() => setActiveTab('blocking')}
-        >
-          Blocked dates
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="availability-modes" role="tablist" aria-label="Availability action">
+          <button
+            type="button"
+            className={activeTab === 'availability' ? '' : 'secondary'}
+            onClick={() => setActiveTab('availability')}
+          >
+            Available dates
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'blocking' ? 'block-mode' : 'secondary'}
+            onClick={() => setActiveTab('blocking')}
+          >
+            Blocked dates
+          </button>
+        </div>
+      )}
 
-      <div className={activeTab === 'availability' ? '' : 'hidden'}>
+      <div className={readOnly || activeTab === 'availability' ? '' : 'hidden'}>
         <PickerSection
           pickerType="availability"
           savedSlots={availabilitySlots}
           availabilityMap={availabilityMap}
           blockingMap={blockingMap}
           matchDates={matchDates}
+          participantStatusMap={participantStatusMap}
+          readOnly={readOnly}
           minDate={minDate}
           maxDate={maxDate}
           saving={saving}
@@ -131,13 +140,15 @@ export function AvailabilityManager({
           onDeleteSlot={onDeleteSlot}
         />
       </div>
-      <div className={activeTab === 'blocking' ? '' : 'hidden'}>
+      <div className={!readOnly && activeTab === 'blocking' ? '' : 'hidden'}>
         <PickerSection
           pickerType="blocking"
           savedSlots={blockingSlots}
           availabilityMap={availabilityMap}
           blockingMap={blockingMap}
           matchDates={matchDates}
+          participantStatusMap={participantStatusMap}
+          readOnly={readOnly}
           minDate={minDate}
           maxDate={maxDate}
           saving={saving}
@@ -155,6 +166,8 @@ function PickerSection({
   availabilityMap,
   blockingMap,
   matchDates,
+  participantStatusMap,
+  readOnly,
   minDate,
   maxDate,
   saving,
@@ -166,6 +179,8 @@ function PickerSection({
   availabilityMap: Map<DateString, DayAvailability>;
   blockingMap: Map<DateString, DayBlock>;
   matchDates: DateString[];
+  participantStatusMap: Map<DateString, DateParticipantStatus>;
+  readOnly: boolean;
   minDate: Date;
   maxDate: Date;
   saving: boolean;
@@ -327,13 +342,15 @@ function PickerSection({
         availabilityMap={availabilityMap}
         blockingMap={blockingMap}
         matchDates={matchDates}
+        participantStatusMap={participantStatusMap}
+        readOnly={readOnly}
         pickerType={pickerType}
         minDate={minDate}
         maxDate={maxDate}
       />
       <DateStateLegend pickerType={pickerType} />
 
-      {pendingDates.length > 0 && (
+      {!readOnly && pendingDates.length > 0 && (
         <div className="pending-day-editors">
           {pendingDates.map((date) => (
             <div className="pending-day-editor" key={date}>
@@ -369,17 +386,25 @@ function PickerSection({
           </div>
         </div>
       )}
-      {!pendingDates.length && localError && <p className="error-note">{localError}</p>}
+      {!readOnly && !pendingDates.length && localError && (
+        <p className="error-note">{localError}</p>
+      )}
 
-      <h4>{pickerType === 'availability' ? 'Your saved availability' : 'Your blocked dates'}</h4>
-      {chipEntries.length ? (
-        <SelectedDayChips entries={chipEntries} />
-      ) : (
-        <p className="availability-note">
-          {pickerType === 'availability'
-            ? 'No availability saved yet.'
-            : 'No blocked dates saved yet.'}
-        </p>
+      {!readOnly && (
+        <>
+          <h4>
+            {pickerType === 'availability' ? 'Your saved availability' : 'Your blocked dates'}
+          </h4>
+          {chipEntries.length ? (
+            <SelectedDayChips entries={chipEntries} />
+          ) : (
+            <p className="availability-note">
+              {pickerType === 'availability'
+                ? 'No availability saved yet.'
+                : 'No blocked dates saved yet.'}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
