@@ -683,14 +683,17 @@ export default function Page() {
 
     const matchGroup = editing ? ((editing.league_group || 'Group B') as Group) : group;
 
-    const conflict = matches.find(
-      (match) =>
-        match.id !== editing?.id &&
-        (match.league_group || 'Group B') === matchGroup &&
-        match.match_date === draft.match_date &&
-        match.status !== 'Cancelled' &&
-        teamIds(match, matchGroup).some((id) => id === first || id === second)
-    );
+    const conflict =
+      draft.status === 'Cancelled'
+        ? undefined
+        : matches.find(
+            (match) =>
+              match.id !== editing?.id &&
+              (match.league_group || 'Group B') === matchGroup &&
+              match.match_date === draft.match_date &&
+              match.status !== 'Cancelled' &&
+              teamIds(match, matchGroup).some((id) => id === first || id === second)
+          );
 
     if (conflict) {
       setNote('One of these teams already has an active match on that date.');
