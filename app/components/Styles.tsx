@@ -298,7 +298,9 @@ export function Styles() {
 
       @media(max-width:650px){
         main{padding:14px}
-        .top{display:grid;gap:14px}
+        .top{display:grid;grid-template-columns:1fr;gap:14px}
+        .top .group-schedule{width:100%;justify-self:stretch}
+        .top .identity-picker{justify-self:stretch}
         .identity-picker{width:100%}
         .identity-select{width:100%;min-width:0;max-width:none}
         .tabs{overflow-x:auto;scrollbar-width:none}
