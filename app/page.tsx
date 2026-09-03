@@ -39,6 +39,7 @@ import {
 } from './lib/scheduling';
 import { SlotSaveInput } from './components/AvailabilityManager';
 import { computeStandings, ScoreEntryState, validateScores } from './lib/scoring';
+import { normalizeDate } from './lib/availabilityHelpers';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { IdentityPrompt, MatchModal } from './components/MatchModal';
@@ -347,7 +348,7 @@ export default function Page() {
     const dates = new Set<string>();
     allAvailability.forEach((slot) => {
       if (participants.some((participant) => participant.key === slot.playerId)) {
-        dates.add(slot.startsAt.slice(0, 10));
+        dates.add(normalizeDate(slot.startsAt));
       }
     });
     const map = new Map<string, DateParticipantStatus>();
@@ -355,7 +356,7 @@ export default function Page() {
       const status: DateParticipantStatus = { available: [], blocked: [], missing: [] };
       participants.forEach((participant) => {
         const slots = allAvailability.filter(
-          (slot) => slot.playerId === participant.key && slot.startsAt.slice(0, 10) === date
+          (slot) => slot.playerId === participant.key && normalizeDate(slot.startsAt) === date
         );
         const hasAvailable = slots.some((slot) => (slot.kind ?? 'available') === 'available');
         const hasBlocked = slots.some((slot) => (slot.kind ?? 'available') === 'blocked');
