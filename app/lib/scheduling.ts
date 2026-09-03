@@ -7,11 +7,19 @@ export const SEASON_DEADLINE_DATE = '2026-09-30';
 export const DEFAULT_MATCH_DURATION_MINUTES = 120;
 export const DEFAULT_SCHEDULING_INCREMENT_MINUTES = 30;
 
+// `kind`/`mode` are optional for backward compatibility with rows saved before
+// availability/blocking were tracked as distinct records (they default to
+// 'available'/'time_windows', matching the original behavior).
+export type SlotKind = 'available' | 'blocked';
+export type SlotMode = 'anytime' | 'time_windows' | 'all_day';
+
 export type AvailabilitySlot = {
   id: string;
   playerId: string;
   startsAt: string;
   endsAt: string;
+  kind?: SlotKind;
+  mode?: SlotMode;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -62,6 +70,25 @@ export const intersectTimeWindows = (windowsByPlayer: TimeWindow[][]) => {
       endsAt: window.endsAt.toISOString(),
     }))
   );
+};
+
+/**
+ * Merge a player's "available" slots into windows, then subtract any "blocked"
+ * slots (all-day or specific windows), producing the effective time this
+ * player can actually play.
+ */
+export const effectiveWindowsForPlayer = (slots: AvailabilitySlot[]): TimeWindow[] => {
+  const available = slots.filter((slot) => (slot.kind ?? 'available') === 'available');
+  const blocked = slots.filter((slot) => (slot.kind ?? 'available') === 'blocked');
+  let windows = mergeAvailabilitySlots(available);
+  for (const block of blocked) {
+    const blockedWindow: TimeWindow = {
+      startsAt: new Date(block.startsAt),
+      endsAt: new Date(block.endsAt),
+    };
+    windows = windows.flatMap((window) => subtractTimeWindow(window, blockedWindow));
+  }
+  return windows;
 };
 
 export const generateSuggestedStarts = (

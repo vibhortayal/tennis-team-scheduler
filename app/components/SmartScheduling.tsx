@@ -1,6 +1,6 @@
 import { Group, Identity, teamDisplay } from '../teams';
 import { Match, Suggestion, dateText } from '../lib/matches';
-import { AvailabilityManager, AvailabilitySlot } from './AvailabilityManager';
+import { AvailabilityManager, AvailabilitySlot, SlotSaveInput } from './AvailabilityManager';
 import { TeamContext } from './MatchCard';
 
 type SmartSchedulingProps = {
@@ -20,14 +20,13 @@ type SmartSchedulingProps = {
   onFind: () => void;
   onOpponentFilter: (v: string) => void;
   onSchedule: (s: Suggestion) => void;
-  availability: AvailabilitySlot[];
+  availabilitySlots: AvailabilitySlot[];
+  blockingSlots: AvailabilitySlot[];
+  teamMatches: Match[];
   availabilitySaving: boolean;
   availabilityError: string;
-  onAvailabilitySave: (startsAt: string, endsAt: string, id?: string) => Promise<void>;
-  onAvailabilityDelete: (id: string) => Promise<void>;
-  onAvailabilityBlock: (startsAt: string, endsAt: string) => Promise<void>;
-  scheduledDates: string[];
-  scheduledTimes: Array<{ date: string; startsAt: string; endsAt: string }>;
+  onSaveSlot: (input: SlotSaveInput) => Promise<void>;
+  onDeleteSlot: (id: string) => Promise<void>;
   copyReminder: () => void;
   copyMissingReminder: (names: string[]) => void;
   partnerName: string;
@@ -52,14 +51,13 @@ export function SmartScheduling({
   onFind,
   onOpponentFilter,
   onSchedule,
-  availability,
+  availabilitySlots,
+  blockingSlots,
+  teamMatches,
   availabilitySaving,
   availabilityError,
-  onAvailabilitySave,
-  onAvailabilityDelete,
-  onAvailabilityBlock,
-  scheduledDates,
-  scheduledTimes,
+  onSaveSlot,
+  onDeleteSlot,
   copyReminder,
   copyMissingReminder,
   partnerName,
@@ -102,8 +100,8 @@ export function SmartScheduling({
                 <b>{partnerName}</b> partner
               </span>
               <span>
-                <b>{availability.length}</b> availability window
-                {availability.length === 1 ? '' : 's'}
+                <b>{availabilitySlots.length}</b> availability window
+                {availabilitySlots.length === 1 ? '' : 's'}
               </span>
             </div>
           </>
@@ -134,18 +132,17 @@ export function SmartScheduling({
           </div>
 
           <AvailabilityManager
-            slots={availability}
+            availabilitySlots={availabilitySlots}
+            blockingSlots={blockingSlots}
+            teamMatches={teamMatches}
             deadline="2026-09-30T23:59:59.999Z"
             saving={availabilitySaving}
             error={availabilityError}
-            onSave={onAvailabilitySave}
-            onDelete={onAvailabilityDelete}
-            onBlock={onAvailabilityBlock}
-            scheduledDates={scheduledDates}
-            scheduledTimes={scheduledTimes}
+            onSaveSlot={onSaveSlot}
+            onDeleteSlot={onDeleteSlot}
           />
 
-          {availability.length === 0 ? (
+          {availabilitySlots.length === 0 ? (
             <div className="readiness-card readiness-warning" role="status">
               <b>Add your availability to unlock match suggestions before September 30.</b>
             </div>
