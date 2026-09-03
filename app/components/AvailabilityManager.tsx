@@ -1,373 +1,386 @@
-import { FormEvent, useState } from 'react';
-import { AvailabilitySlot, SEASON_DEADLINE_DATE } from '../lib/scheduling';
+import { useMemo, useState } from 'react';
+import { AvailabilitySlot, SlotKind, SlotMode } from '../lib/scheduling';
+import { Match } from '../lib/matches';
+import {
+  buildAvailabilityMap,
+  buildBlockingMap,
+  doTimeWindowsOverlap,
+  formatDateDisplay,
+  fullDayWindow,
+  getMatchDates,
+  normalizeDate,
+  timeWindowFromSlot,
+  windowToIso,
+  DateString,
+  DayAvailability,
+  DayBlock,
+  PickerType,
+} from '../lib/availabilityHelpers';
+import { MultiDateCalendar, DateStateLegend } from './MultiDateCalendar';
+import { SelectedDayChips, SelectedDayChipEntry } from './SelectedDayChips';
+import { DayModeSelector } from './DayModeSelector';
+import { TimeWindowSelector } from './TimeWindowSelector';
+
 export type { AvailabilitySlot } from '../lib/scheduling';
 
-type TimeRange = { start: string; end: string };
+export type SlotSaveInput = {
+  kind: SlotKind;
+  mode: SlotMode;
+  startsAt: string;
+  endsAt: string;
+};
+
 type AvailabilityManagerProps = {
-  slots: AvailabilitySlot[];
+  availabilitySlots: AvailabilitySlot[];
+  blockingSlots: AvailabilitySlot[];
+  teamMatches: Match[];
   deadline: string;
-  scheduledDates: string[];
-  scheduledTimes: Array<{ date: string; startsAt: string; endsAt: string }>;
   saving: boolean;
   error: string;
-  onSave: (startsAt: string, endsAt: string, id?: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-  onBlock: (startsAt: string, endsAt: string) => Promise<void>;
+  onSaveSlot: (input: SlotSaveInput) => Promise<void>;
+  onDeleteSlot: (id: string) => Promise<void>;
 };
 
-const localParts = (iso: string) => {
-  const date = new Date(iso);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return {
-    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
-  };
-};
-const today = () => localParts(new Date().toISOString()).date;
-const dayOffset = (dateText: string, offset: number) => {
-  const date = new Date(`${dateText}T12:00:00`);
-  date.setDate(date.getDate() + offset);
-  return localParts(date.toISOString()).date;
-};
+type PendingConfig = { mode: string; windows: string[] };
+type PendingEntry = { date: DateString; mode: string; windows: string[] };
 
 export function AvailabilityManager({
-  slots,
+  availabilitySlots,
+  blockingSlots,
+  teamMatches,
   deadline,
-  scheduledDates,
-  scheduledTimes,
   saving,
   error,
-  onSave,
-  onDelete,
-  onBlock,
+  onSaveSlot,
+  onDeleteSlot,
 }: AvailabilityManagerProps) {
-  const [step, setStep] = useState(1);
-  const [mode, setMode] = useState<'available' | 'blocked'>('available');
-  const [dates, setDates] = useState<string[]>([]);
-  const [timePlan, setTimePlan] = useState<'blanket' | 'daily'>('blanket');
-  const [blanket, setBlanket] = useState<TimeRange>({ start: '', end: '' });
-  const [daily, setDaily] = useState<Record<string, TimeRange>>({});
-  const [editingId, setEditingId] = useState<string>();
-  const [formError, setFormError] = useState('');
-  const maxDate = SEASON_DEADLINE_DATE;
-  const timeOptions = Array.from({ length: 27 }, (_, index) => {
-    const minutes = 7 * 60 + index * 30;
-    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-  });
+  const [activeTab, setActiveTab] = useState<PickerType>('availability');
+  const matchDates = useMemo(() => getMatchDates(teamMatches), [teamMatches]);
+  const availabilityMap = useMemo(
+    () => buildAvailabilityMap(availabilitySlots),
+    [availabilitySlots]
+  );
+  const blockingMap = useMemo(() => buildBlockingMap(blockingSlots), [blockingSlots]);
+  const minDate = useMemo(() => new Date(), []);
+  const maxDate = useMemo(() => new Date(deadline), [deadline]);
 
-  const reset = () => {
-    setStep(1);
-    setDates([]);
-    setBlanket({ start: '', end: '' });
-    setDaily({});
-    setEditingId(undefined);
-    setFormError('');
-  };
-  const formatDate = (value: Date) => {
-    const pad = (number: number) => String(number).padStart(2, '0');
-    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
-  };
-  const calendarDays = Array.from({ length: 28 }, (_, index) => {
-    const day = new Date(`${today()}T12:00:00`);
-    day.setDate(day.getDate() + index);
-    return day;
-  }).filter((day) => formatDate(day) <= maxDate);
-  const toggleDate = (value: string) => {
-    if (dates.includes(value))
-      setDates((current) => current.filter((dateValue) => dateValue !== value));
-    else setDates((current) => [...current, value].sort());
-    setFormError('');
-  };
-  const rangeFor = (selectedDate: string) =>
-    timePlan === 'blanket' ? blanket : daily[selectedDate] || { start: '', end: '' };
-  const updateDaily = (selectedDate: string, key: keyof TimeRange, value: string) =>
-    setDaily((current) => ({
-      ...current,
-      [selectedDate]: { ...rangeFor(selectedDate), [key]: value },
-    }));
-  const asDateTime = (selectedDate: string, time: string) => new Date(`${selectedDate}T${time}`);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!dates.length) {
-      setFormError('Choose at least one date first.');
-      setStep(1);
-      return;
-    }
-    const windows: Array<{ startsAt: string; endsAt: string }> = [];
-    for (const selectedDate of dates) {
-      const range = rangeFor(selectedDate);
-      const start = asDateTime(selectedDate, range.start);
-      const end = asDateTime(selectedDate, range.end);
-      if (!range.start || !range.end || end <= start || start <= new Date()) {
-        setFormError(`Choose a valid future time for ${selectedDate}.`);
-        return;
+  const submitAvailability = async (entries: PendingEntry[]) => {
+    for (const entry of entries) {
+      if (entry.mode === 'anytime') {
+        const { startsAt, endsAt } = fullDayWindow(entry.date);
+        await onSaveSlot({ kind: 'available', mode: 'anytime', startsAt, endsAt });
+      } else {
+        for (const window of entry.windows) {
+          const { startsAt, endsAt } = windowToIso(entry.date, window);
+          await onSaveSlot({ kind: 'available', mode: 'time_windows', startsAt, endsAt });
+        }
       }
-      if (end > new Date(deadline)) {
-        setFormError('Times must end by September 30, 2026.');
-        return;
-      }
-      const conflict = scheduledTimes.some(
-        (scheduled) =>
-          scheduled.date === selectedDate &&
-          start < asDateTime(selectedDate, scheduled.endsAt) &&
-          end > asDateTime(selectedDate, scheduled.startsAt)
-      );
-      if (conflict) {
-        setFormError(`That time overlaps a scheduled match on ${selectedDate}. Pick another time.`);
-        return;
-      }
-      windows.push({ startsAt: start.toISOString(), endsAt: end.toISOString() });
     }
-    setFormError('');
-    for (const window of windows) {
-      if (mode === 'blocked') await onBlock(window.startsAt, window.endsAt);
-      else await onSave(window.startsAt, window.endsAt, editingId);
-    }
-    reset();
   };
 
-  const edit = (slot: AvailabilitySlot) => {
-    const start = localParts(slot.startsAt);
-    const end = localParts(slot.endsAt);
-    setMode('available');
-    setEditingId(slot.id);
-    setDates([start.date]);
-    setBlanket({ start: start.time, end: end.time });
-    setStep(3);
-    setFormError('');
-  };
-  const selectMode = (nextMode: 'available' | 'blocked') => {
-    reset();
-    setMode(nextMode);
-  };
-  const nearbyMatchNote = (dateText: string) => {
-    const notes = [];
-    if (scheduledDates.includes(dayOffset(dateText, -1))) notes.push('Match previous day');
-    if (scheduledDates.includes(dateText)) notes.push('Match today');
-    if (scheduledDates.includes(dayOffset(dateText, 1))) notes.push('Match next day');
-    return notes.join(' · ');
+  const submitBlocking = async (entries: PendingEntry[]) => {
+    for (const entry of entries) {
+      if (entry.mode === 'all_day') {
+        const { startsAt, endsAt } = fullDayWindow(entry.date);
+        await onSaveSlot({ kind: 'blocked', mode: 'all_day', startsAt, endsAt });
+      } else {
+        for (const window of entry.windows) {
+          const { startsAt, endsAt } = windowToIso(entry.date, window);
+          await onSaveSlot({ kind: 'blocked', mode: 'time_windows', startsAt, endsAt });
+        }
+      }
+    }
   };
 
   return (
     <div className="availability-manager">
-      <h3>{mode === 'blocked' ? 'Blocked dates' : 'Available dates'}</h3>
+      <h3>Availability &amp; blocking</h3>
       <p>
-        We&apos;ll walk you through it. You can select several dates and add more than one window on
-        each date.
+        Pick dates on the calendar, choose &quot;anytime&quot; or specific time windows, then save.
+        Match days are locked automatically and the two calendars stay in sync with each other.
       </p>
-      {(formError || error) && <p className="error-note">{formError || error}</p>}
+      {error && <p className="error-note">{error}</p>}
       <div className="availability-modes" role="tablist" aria-label="Availability action">
         <button
           type="button"
-          className={mode === 'available' ? '' : 'secondary'}
-          onClick={() => selectMode('available')}
+          className={activeTab === 'availability' ? '' : 'secondary'}
+          onClick={() => setActiveTab('availability')}
         >
           Available dates
         </button>
         <button
           type="button"
-          className={mode === 'blocked' ? 'block-mode' : 'secondary'}
-          onClick={() => selectMode('blocked')}
+          className={activeTab === 'blocking' ? 'block-mode' : 'secondary'}
+          onClick={() => setActiveTab('blocking')}
         >
           Blocked dates
         </button>
       </div>
-      {step === 1 && (
-        <div className="availability-step">
-          <h4>Which dates work?</h4>
-          <p>
-            Select as many dates as you like. Scheduled match dates are okay; only their match time
-            is protected.
-          </p>
-          <div className="date-checklist" aria-label="Select available dates">
-            <strong>Upcoming dates through September 30</strong>
-            <div className="date-options">
-              {calendarDays.map((calendarDay) => {
-                const value = formatDate(calendarDay);
-                const selected = dates.includes(value);
-                return (
-                  <label key={value} className={`date-option ${selected ? 'selected' : ''}`}>
-                    <input type="checkbox" checked={selected} onChange={() => toggleDate(value)} />
-                    <span>
-                      <b>{calendarDay.toLocaleDateString('en-US', { weekday: 'short' })}</b>{' '}
-                      {calendarDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                    {nearbyMatchNote(value) && <small>{nearbyMatchNote(value)}</small>}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div className="selected-dates">
-            {dates.map((selectedDate) => (
-              <button
-                type="button"
-                className="date-chip"
-                key={selectedDate}
-                onClick={() =>
-                  setDates((current) => current.filter((value) => value !== selectedDate))
-                }
-              >
-                {selectedDate}
-                {nearbyMatchNote(selectedDate) ? ` · ${nearbyMatchNote(selectedDate)}` : ''}{' '}
-                <span aria-hidden="true">×</span>
-              </button>
-            ))}
-          </div>
-          <div className="assistant-actions">
-            <span />
-            <button type="button" disabled={!dates.length} onClick={() => setStep(2)}>
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-      {step === 2 && (
-        <div className="availability-step">
-          <h4>Do these dates share a time?</h4>
-          <p>
-            Use one blanket time if your schedule is consistent, or choose different times day by
-            day.
-          </p>
-          <div className="choice-list">
-            <label>
-              <input
-                type="radio"
-                checked={timePlan === 'blanket'}
-                onChange={() => setTimePlan('blanket')}
-              />{' '}
-              Same time on every selected date
-            </label>
-            <label>
-              <input
-                type="radio"
-                checked={timePlan === 'daily'}
-                onChange={() => setTimePlan('daily')}
-              />{' '}
-              Different time on each date
-            </label>
-          </div>
-          <div className="assistant-actions">
-            <button type="button" className="secondary" onClick={() => setStep(1)}>
-              Back
-            </button>
-            <button type="button" onClick={() => setStep(3)}>
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-      {step === 3 && (
-        <form id="availability-form" className="availability-step" onSubmit={submit}>
-          <h4>{timePlan === 'blanket' ? 'What time works?' : 'Set each day&apos;s time'}</h4>
-          {timePlan === 'blanket' ? (
-            <div className="time-row">
-              <TimeSelect
-                label="From"
-                value={blanket.start}
-                options={timeOptions.slice(0, -1)}
-                onChange={(value) => setBlanket((current) => ({ ...current, start: value }))}
-              />
-              <TimeSelect
-                label="Until"
-                value={blanket.end}
-                options={timeOptions.slice(1)}
-                onChange={(value) => setBlanket((current) => ({ ...current, end: value }))}
-              />
-            </div>
-          ) : (
-            <div className="daily-times">
-              {dates.map((selectedDate) => (
-                <div className="daily-time" key={selectedDate}>
-                  <b>{selectedDate}</b>
-                  <TimeSelect
-                    label="From"
-                    value={rangeFor(selectedDate).start}
-                    options={timeOptions.slice(0, -1)}
-                    onChange={(value) => updateDaily(selectedDate, 'start', value)}
-                  />
-                  <TimeSelect
-                    label="Until"
-                    value={rangeFor(selectedDate).end}
-                    options={timeOptions.slice(1)}
-                    onChange={(value) => updateDaily(selectedDate, 'end', value)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="assistant-actions">
-            <button type="button" className="secondary" onClick={() => setStep(2)}>
-              Back
-            </button>
-            <button disabled={saving}>
-              {mode === 'blocked'
-                ? 'Block selected times'
-                : editingId
-                  ? 'Update time'
-                  : 'Save selected times'}
-            </button>
-          </div>
-        </form>
-      )}
-      {scheduledDates.length > 0 && (
-        <p className="availability-note">
-          Scheduled dates still allow other times: {scheduledDates.join(', ')}.
-        </p>
-      )}
-      {slots.length > 0 && (
-        <ul className="availability-list">
-          {slots.map((slot) => {
-            const start = localParts(slot.startsAt);
-            const end = localParts(slot.endsAt);
-            return (
-              <li key={slot.id}>
-                <span>
-                  {start.date} · {start.time} - {end.time}
-                  {nearbyMatchNote(start.date) && (
-                    <small className="availability-adjacent">{nearbyMatchNote(start.date)}</small>
-                  )}
-                </span>
-                <span className="availability-actions">
-                  <button type="button" className="secondary" onClick={() => edit(slot)}>
-                    Edit
-                  </button>
-                  <button type="button" className="secondary" onClick={() => onDelete(slot.id)}>
-                    Remove
-                  </button>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+
+      <div className={activeTab === 'availability' ? '' : 'hidden'}>
+        <PickerSection
+          pickerType="availability"
+          savedSlots={availabilitySlots}
+          availabilityMap={availabilityMap}
+          blockingMap={blockingMap}
+          matchDates={matchDates}
+          minDate={minDate}
+          maxDate={maxDate}
+          saving={saving}
+          onSubmit={submitAvailability}
+          onDeleteSlot={onDeleteSlot}
+        />
+      </div>
+      <div className={activeTab === 'blocking' ? '' : 'hidden'}>
+        <PickerSection
+          pickerType="blocking"
+          savedSlots={blockingSlots}
+          availabilityMap={availabilityMap}
+          blockingMap={blockingMap}
+          matchDates={matchDates}
+          minDate={minDate}
+          maxDate={maxDate}
+          saving={saving}
+          onSubmit={submitBlocking}
+          onDeleteSlot={onDeleteSlot}
+        />
+      </div>
     </div>
   );
 }
 
-function TimeSelect({
-  label,
-  value,
-  options,
-  onChange,
+function PickerSection({
+  pickerType,
+  savedSlots,
+  availabilityMap,
+  blockingMap,
+  matchDates,
+  minDate,
+  maxDate,
+  saving,
+  onSubmit,
+  onDeleteSlot,
 }: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
+  pickerType: PickerType;
+  savedSlots: AvailabilitySlot[];
+  availabilityMap: Map<DateString, DayAvailability>;
+  blockingMap: Map<DateString, DayBlock>;
+  matchDates: DateString[];
+  minDate: Date;
+  maxDate: Date;
+  saving: boolean;
+  onSubmit: (entries: PendingEntry[]) => Promise<void>;
+  onDeleteSlot: (id: string) => Promise<void>;
 }) {
+  const [pendingDates, setPendingDates] = useState<DateString[]>([]);
+  const [configs, setConfigs] = useState<Record<DateString, PendingConfig>>({});
+  const [localError, setLocalError] = useState('');
+
+  const defaultMode = pickerType === 'availability' ? 'anytime' : 'all_day';
+  const modeOptions =
+    pickerType === 'availability'
+      ? [
+          { value: 'anytime', label: 'Available anytime' },
+          { value: 'time_windows', label: 'Specific time window(s)' },
+        ]
+      : [
+          { value: 'all_day', label: 'Blocked all day' },
+          { value: 'time_windows', label: 'Specific time window(s)' },
+        ];
+
+  const toggleDate = (date: DateString) => {
+    setLocalError('');
+    if (pendingDates.includes(date)) {
+      setPendingDates((current) => current.filter((d) => d !== date));
+      setConfigs((current) => {
+        const next = { ...current };
+        delete next[date];
+        return next;
+      });
+      return;
+    }
+    setPendingDates((current) => [...current, date].sort());
+    setConfigs((current) => ({
+      ...current,
+      [date]: current[date] || { mode: defaultMode, windows: [] },
+    }));
+  };
+
+  const removePendingDate = (date: DateString) => {
+    setPendingDates((current) => current.filter((d) => d !== date));
+    setConfigs((current) => {
+      const next = { ...current };
+      delete next[date];
+      return next;
+    });
+  };
+
+  const updateConfig = (date: DateString, config: PendingConfig) =>
+    setConfigs((current) => ({ ...current, [date]: config }));
+
+  // Validate a pending entry against the OTHER picker's already-saved state for that date.
+  // Overlapping windows between available/blocked are never allowed; all-day states dominate.
+  const validateEntry = (date: DateString, mode: string, windows: string[]): string | undefined => {
+    if (pickerType === 'availability') {
+      const blocked = blockingMap.get(date);
+      if (!blocked) return undefined;
+      if (blocked.mode === 'all_day' || mode === 'anytime')
+        return `${formatDateDisplay(date)} already has a conflicting blocked entry.`;
+      if (
+        blocked.timeWindows &&
+        windows.some((w) => blocked.timeWindows!.some((bw) => doTimeWindowsOverlap(w, bw)))
+      )
+        return `${formatDateDisplay(date)}: that time overlaps a blocked window.`;
+      return undefined;
+    }
+    const available = availabilityMap.get(date);
+    if (!available) return undefined;
+    if (available.mode === 'anytime' || mode === 'all_day')
+      return `${formatDateDisplay(date)} already has a conflicting availability entry.`;
+    if (
+      available.timeWindows &&
+      windows.some((w) => available.timeWindows!.some((aw) => doTimeWindowsOverlap(w, aw)))
+    )
+      return `${formatDateDisplay(date)}: that time overlaps an availability window.`;
+    return undefined;
+  };
+
+  const save = async () => {
+    if (!pendingDates.length) {
+      setLocalError('Choose at least one date first.');
+      return;
+    }
+    for (const date of pendingDates) {
+      const config = configs[date];
+      if (config.mode === 'time_windows' && !config.windows.length) {
+        setLocalError(`Choose at least one time window for ${formatDateDisplay(date)}.`);
+        return;
+      }
+      const conflict = validateEntry(date, config.mode, config.windows);
+      if (conflict) {
+        setLocalError(conflict);
+        return;
+      }
+    }
+    setLocalError('');
+    await onSubmit(
+      pendingDates.map((date) => ({
+        date,
+        mode: configs[date].mode,
+        windows: configs[date].windows,
+      }))
+    );
+    setPendingDates([]);
+    setConfigs({});
+  };
+
+  const savedByDate = useMemo(() => {
+    const map = new Map<DateString, AvailabilitySlot[]>();
+    savedSlots.forEach((slot) => {
+      const date = normalizeDate(slot.startsAt);
+      map.set(date, [...(map.get(date) || []), slot]);
+    });
+    return map;
+  }, [savedSlots]);
+
+  const chipEntries: SelectedDayChipEntry[] = Array.from(savedByDate.entries()).map(
+    ([date, slots]) => {
+      const allDaySlot = slots.find((slot) => (slot.mode ?? 'time_windows') === defaultMode);
+      const modeLabel = allDaySlot
+        ? pickerType === 'availability'
+          ? 'Available anytime'
+          : 'Blocked all day'
+        : 'Specific time window(s)';
+      const timeWindows = allDaySlot ? undefined : slots.map(timeWindowFromSlot);
+      return {
+        date,
+        modeLabel,
+        timeWindows,
+        onRemove: () => {
+          slots.forEach((slot) => {
+            onDeleteSlot(slot.id);
+          });
+        },
+        onEdit: () => {
+          slots.forEach((slot) => {
+            onDeleteSlot(slot.id);
+          });
+          setPendingDates((current) =>
+            current.includes(date) ? current : [...current, date].sort()
+          );
+          setConfigs((current) => ({
+            ...current,
+            [date]: allDaySlot
+              ? { mode: defaultMode, windows: [] }
+              : { mode: 'time_windows', windows: slots.map(timeWindowFromSlot) },
+          }));
+        },
+      };
+    }
+  );
+
   return (
-    <label className="field">
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} required>
-        <option value="">Select time</option>
-        {options.map((time) => (
-          <option key={time} value={time}>
-            {time}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="picker-section">
+      <MultiDateCalendar
+        selectedDates={pendingDates}
+        onDateToggle={toggleDate}
+        availabilityMap={availabilityMap}
+        blockingMap={blockingMap}
+        matchDates={matchDates}
+        pickerType={pickerType}
+        minDate={minDate}
+        maxDate={maxDate}
+      />
+      <DateStateLegend pickerType={pickerType} />
+
+      {pendingDates.length > 0 && (
+        <div className="pending-day-editors">
+          {pendingDates.map((date) => (
+            <div className="pending-day-editor" key={date}>
+              <div className="pending-day-editor-header">
+                <b>{formatDateDisplay(date)}</b>
+                <button type="button" className="secondary" onClick={() => removePendingDate(date)}>
+                  Remove
+                </button>
+              </div>
+              <DayModeSelector
+                name={`${pickerType}-mode-${date}`}
+                value={configs[date]?.mode ?? defaultMode}
+                options={modeOptions}
+                onChange={(mode) =>
+                  updateConfig(date, { mode, windows: configs[date]?.windows ?? [] })
+                }
+              />
+              {configs[date]?.mode === 'time_windows' && (
+                <TimeWindowSelector
+                  date={date}
+                  selected={configs[date]?.windows ?? []}
+                  onChange={(windows) => updateConfig(date, { mode: 'time_windows', windows })}
+                />
+              )}
+            </div>
+          ))}
+          {localError && <p className="error-note">{localError}</p>}
+          <div className="assistant-actions">
+            <span />
+            <button type="button" disabled={saving} onClick={save}>
+              {pickerType === 'availability' ? 'Save availability' : 'Save blocked times'}
+            </button>
+          </div>
+        </div>
+      )}
+      {!pendingDates.length && localError && <p className="error-note">{localError}</p>}
+
+      <h4>{pickerType === 'availability' ? 'Your saved availability' : 'Your blocked dates'}</h4>
+      {chipEntries.length ? (
+        <SelectedDayChips entries={chipEntries} />
+      ) : (
+        <p className="availability-note">
+          {pickerType === 'availability'
+            ? 'No availability saved yet.'
+            : 'No blocked dates saved yet.'}
+        </p>
+      )}
+    </div>
   );
 }

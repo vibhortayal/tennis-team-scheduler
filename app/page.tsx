@@ -30,14 +30,14 @@ import {
   AvailabilitySlot,
   DEFAULT_MATCH_DURATION_MINUTES,
   SEASON_DEADLINE,
+  effectiveWindowsForPlayer,
   generateSuggestedStarts,
   intersectTimeWindows,
   isEligibleForSuggestion,
-  mergeAvailabilitySlots,
   playerKeysForTeam,
   rankMatchSuggestions,
-  subtractTimeWindow,
 } from './lib/scheduling';
+import { SlotSaveInput } from './components/AvailabilityManager';
 import { computeStandings, ScoreEntryState, validateScores } from './lib/scoring';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
@@ -85,7 +85,21 @@ export default function Page() {
       .map((name) => name.trim())
       .find((name) => name !== identity.name) || 'Your partner';
   const partnerReady = allAvailability.some(
-    (slot) => slot.playerId === `${scheduleGroup}:${suggestionTeam}:${partnerName}`
+    (slot) =>
+      (slot.kind ?? 'available') === 'available' &&
+      slot.playerId === `${scheduleGroup}:${suggestionTeam}:${partnerName}`
+  );
+  const availabilitySlots = useMemo(
+    () => availability.filter((slot) => (slot.kind ?? 'available') === 'available'),
+    [availability]
+  );
+  const blockingSlots = useMemo(
+    () => availability.filter((slot) => (slot.kind ?? 'available') === 'blocked'),
+    [availability]
+  );
+  const teamMatches = useMemo(
+    () => matchesForTeam(matches, scheduleGroup, suggestionTeam),
+    [matches, scheduleGroup, suggestionTeam]
   );
 
   const load = async () => {
@@ -133,6 +147,8 @@ export default function Page() {
         player_key: string;
         starts_at: string;
         ends_at: string;
+        kind?: 'available' | 'blocked';
+        mode?: 'anytime' | 'time_windows' | 'all_day';
         created_at?: string;
         updated_at?: string;
       }>;
@@ -141,6 +157,8 @@ export default function Page() {
         playerId: row.player_key,
         startsAt: row.starts_at,
         endsAt: row.ends_at,
+        kind: row.kind ?? 'available',
+        mode: row.mode ?? 'time_windows',
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }));
@@ -222,76 +240,41 @@ export default function Page() {
     }
   };
 
-  const saveAvailability = async (startsAt: string, endsAt: string, id?: string) => {
+  const saveSlot = async (input: SlotSaveInput, id?: string) => {
     if (identity.viewing || !availabilityApi || !key) return;
     setAvailabilitySaving(true);
     setAvailabilityError('');
     try {
-      const body = { player_key: identityValue(identity), starts_at: startsAt, ends_at: endsAt };
+      const body = {
+        player_key: identityValue(identity),
+        starts_at: input.startsAt,
+        ends_at: input.endsAt,
+        kind: input.kind,
+        mode: input.mode,
+      };
       const response = await fetch(id ? `${availabilityApi}?id=eq.${id}` : availabilityApi, {
         method: id ? 'PATCH' : 'POST',
         headers,
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error('Could not save availability.');
+      if (!response.ok) throw new Error('Could not save.');
       await loadAvailability(identity);
     } catch {
-      setAvailabilityError('Could not save your availability.');
+      setAvailabilityError('Could not save your update.');
     } finally {
       setAvailabilitySaving(false);
     }
   };
 
-  const deleteAvailability = async (id: string) => {
+  const deleteSlot = async (id: string) => {
     if (!availabilityApi || !key) return;
     setAvailabilitySaving(true);
     try {
       const response = await fetch(`${availabilityApi}?id=eq.${id}`, { method: 'DELETE', headers });
-      if (!response.ok) throw new Error('Could not remove availability.');
-      setAvailability((current) => current.filter((slot) => slot.id !== id));
-    } catch {
-      setAvailabilityError('Could not remove that availability window.');
-    } finally {
-      setAvailabilitySaving(false);
-    }
-  };
-
-  const blockAvailability = async (startsAt: string, endsAt: string) => {
-    if (!availabilityApi || !key) return;
-    setAvailabilitySaving(true);
-    setAvailabilityError('');
-    try {
-      const blocked = { startsAt: new Date(startsAt), endsAt: new Date(endsAt) };
-      const affected = availability.filter((slot) => {
-        const window = { startsAt: new Date(slot.startsAt), endsAt: new Date(slot.endsAt) };
-        return blocked.startsAt < window.endsAt && blocked.endsAt > window.startsAt;
-      });
-      for (const slot of affected) {
-        const response = await fetch(`${availabilityApi}?id=eq.${slot.id}`, {
-          method: 'DELETE',
-          headers,
-        });
-        if (!response.ok) throw new Error('Could not block availability.');
-        const pieces = subtractTimeWindow(
-          { startsAt: new Date(slot.startsAt), endsAt: new Date(slot.endsAt) },
-          blocked
-        );
-        for (const piece of pieces) {
-          const response = await fetch(availabilityApi, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              player_key: identityValue(identity),
-              starts_at: piece.startsAt.toISOString(),
-              ends_at: piece.endsAt.toISOString(),
-            }),
-          });
-          if (!response.ok) throw new Error('Could not restore availability around blocked time.');
-        }
-      }
+      if (!response.ok) throw new Error('Could not remove that entry.');
       await loadAvailability(identity);
     } catch {
-      setAvailabilityError('Could not block that time.');
+      setAvailabilityError('Could not remove that entry.');
     } finally {
       setAvailabilitySaving(false);
     }
@@ -437,7 +420,7 @@ export default function Page() {
       return;
     }
 
-    if (!availability.length) {
+    if (!availabilitySlots.length) {
       setSuggestionNote('Add your availability to unlock match suggestions before September 30.');
       setSuggestions([]);
       return;
@@ -471,7 +454,7 @@ export default function Page() {
       const windows = intersectTimeWindows(
         participants
           .filter((player) => (slotMap.get(player) || []).length > 0)
-          .map((player) => mergeAvailabilitySlots(slotMap.get(player) || []))
+          .map((player) => effectiveWindowsForPlayer(slotMap.get(player) || []))
       );
       const participantNames = groups[scheduleGroup]
         .find(([id]) => id === suggestionTeam)?.[1]
@@ -778,41 +761,13 @@ export default function Page() {
           onFind={findSuggestions}
           onOpponentFilter={setSuggestionOpponent}
           onSchedule={scheduleSuggestion}
-          availability={availability}
+          availabilitySlots={availabilitySlots}
+          blockingSlots={blockingSlots}
+          teamMatches={teamMatches}
           availabilitySaving={availabilitySaving}
           availabilityError={availabilityError}
-          onAvailabilitySave={saveAvailability}
-          onAvailabilityDelete={deleteAvailability}
-          onAvailabilityBlock={blockAvailability}
-          scheduledDates={matches
-            .filter(
-              (match) =>
-                (match.league_group || 'Group B') === scheduleGroup &&
-                matchIncludesTeam(match.matchup, suggestionTeam) &&
-                match.status.toLowerCase() === 'scheduled'
-            )
-            .map((match) => match.match_date)}
-          scheduledTimes={matches
-            .filter(
-              (match) =>
-                (match.league_group || 'Group B') === scheduleGroup &&
-                matchIncludesTeam(match.matchup, suggestionTeam) &&
-                match.status.toLowerCase() === 'scheduled'
-            )
-            .map((match) => ({
-              date: match.match_date,
-              startsAt: match.match_time.slice(0, 5),
-              endsAt: new Intl.DateTimeFormat('en-GB', {
-                timeZone: 'America/Los_Angeles',
-                hour: '2-digit',
-                minute: '2-digit',
-                hourCycle: 'h23',
-              }).format(
-                new Date(
-                  new Date(matchDateTime(match)).valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000
-                )
-              ),
-            }))}
+          onSaveSlot={saveSlot}
+          onDeleteSlot={deleteSlot}
           copyReminder={copyReminder}
           copyMissingReminder={copyMissingReminder}
           partnerName={partnerName}

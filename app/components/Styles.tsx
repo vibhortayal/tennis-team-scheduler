@@ -105,45 +105,75 @@ export function Styles() {
       .gap-text{padding:10px;border-radius:10px;background:#f1f7f1;color:#47614d !important;font-size:13px;line-height:1.5}
       .availability-manager{margin-top:18px;padding-top:18px;border-top:1px solid #d6dfd5}
       .availability-manager h3{margin:0 0 6px}
+      .availability-manager h4{margin:18px 0 8px;font-size:13px;color:#17663d}
       .availability-manager > p{font-size:13px;margin:0 0 12px}
+      .hidden{display:none}
+      .picker-section{display:grid;gap:12px}
+
+      /* === Multi-date calendar === */
+      .multi-date-calendar{border:1px solid #d6dfd5;border-radius:10px;padding:12px;background:#fff}
+      .calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+      .calendar-nav button{min-height:36px;padding:6px 12px}
+      .calendar-nav b{font-size:14px;color:#17663d}
+      .calendar-grid{display:grid;gap:4px}
+      .calendar-header{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;font-weight:800;color:#758278;text-align:center;text-transform:uppercase}
+      .calendar-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+      .calendar-day{min-height:52px;padding:4px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;color:#15231a;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px}
+      .calendar-day.empty{border:none;background:transparent;min-height:52px}
+      .calendar-day .date-number{font-size:13px}
+      .calendar-day .date-label{font-size:9px;font-weight:700;line-height:1.1;text-align:center}
+      .calendar-day.state-normal{background:#fff}
+      .calendar-day.state-available,
+      .calendar-day.state-available-anytime{background:#eaf4eb;border-color:#147a42;color:#17663d}
+      .calendar-day.state-blocked,
+      .calendar-day.state-blocked-all-day{background:#fff3ed;border-color:#d94924;color:#a72c11}
+      .calendar-day.state-match{background:#f1f2ef;border-color:#c7cec8;color:#758278}
+      .calendar-day.selected{outline:2px solid #147a42;outline-offset:-2px}
+      .calendar-day.disabled{cursor:not-allowed;opacity:.75}
+      .calendar-day:not(.disabled):not(.empty):hover{border-color:#147a42}
+
+      .date-state-legend{margin-top:10px}
+      .legend-items{display:flex;flex-wrap:wrap;gap:10px}
+      .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#47614d}
+      .legend-color{width:14px;height:14px;border-radius:4px;border:1px solid #d6dfd5}
+      .legend-color.state-normal{background:#fff}
+      .legend-color.state-available{background:#eaf4eb;border-color:#147a42}
+      .legend-color.state-available-anytime{background:#f1f2ef;border-color:#c7cec8}
+      .legend-color.state-blocked{background:#fff3ed;border-color:#d94924}
+      .legend-color.state-blocked-all-day{background:#f1f2ef;border-color:#c7cec8}
+      .legend-color.state-match{background:#f1f2ef;border-color:#c7cec8}
+
+      /* === Pending day editors === */
+      .pending-day-editors{display:grid;gap:10px;margin-top:12px}
+      .pending-day-editor{display:grid;gap:8px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:#f8fbf7}
+      .pending-day-editor-header{display:flex;justify-content:space-between;align-items:center}
+      .pending-day-editor-header button{min-height:32px;padding:5px 9px;font-size:12px}
+      .day-mode-selector{display:flex;gap:6px;flex-wrap:wrap}
+      .day-mode-selector button{min-height:36px;padding:7px 10px;font-size:12px}
+      .time-window-selector{display:flex;gap:8px;flex-wrap:wrap}
+      .time-window-option{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;font-size:12px;font-weight:700;color:#47614d;cursor:pointer}
+      .time-window-option input{min-height:auto;margin:0;accent-color:#147a42}
+      .time-window-option.selected{border-color:#147a42;background:#eaf4eb;color:#17663d}
+
+      /* === Selected day chips === */
+      .selected-day-chips{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
+      .selected-day-chip{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;font-size:13px}
+      .selected-day-chip-info{display:grid;gap:2px}
+      .selected-day-chip-windows{color:#47614d;font-size:12px}
+      .selected-day-chip-actions{display:flex;gap:6px;flex-shrink:0}
+      .selected-day-chip-actions button{min-height:34px;padding:6px 9px;font-size:12px}
+
       .availability-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
       .availability-step{display:grid;gap:12px;margin-top:14px;padding:14px;border:1px solid #d6dfd5;border-radius:10px;background:#fff}
       .availability-step h4{margin:0;color:#17663d}
       .availability-step p{margin:0;font-size:13px}
-      .date-adder{display:grid;grid-template-columns:1fr auto;gap:8px}
-      .date-checklist{display:grid;gap:10px;padding:12px;border:1px solid #d6dfd5;border-radius:10px;background:#f8fbf7}
-      .date-options{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-      .date-option{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;padding:9px 10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;color:#47614d;font-size:13px;cursor:pointer}
-      .date-option input{min-height:auto;margin:0;accent-color:#147a42}
-      .date-option.selected{border-color:#147a42;background:#eaf4eb;color:#17663d}
-      .date-option small{grid-column:2;color:#a72c11;font-size:10px;font-weight:700}
-      .selected-dates{display:flex;gap:6px;flex-wrap:wrap;min-height:34px}
-      .date-chip{min-height:34px;padding:6px 9px;background:#eaf4eb;color:#17663d;font-size:12px}
-      .availability-adjacent{display:block;margin-top:3px;color:#8c351f;font-size:11px;font-weight:700}
-      .choice-list{display:grid;gap:8px}
-      .choice-list label{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-      .choice-list input{min-height:auto}
-      .time-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .daily-times{display:grid;gap:10px}
-      .daily-time{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;padding:10px;background:#f1f7f1;border-radius:8px}
-      .daily-time b{font-size:13px;color:#17663d}
       .assistant-actions{display:flex;justify-content:space-between;gap:8px}
       .availability-note{font-size:12px;color:#758278 !important}
-      .availability-modes{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
-      .availability-modes button{min-height:36px;padding:7px 10px;font-size:12px}
-      .availability-modes .block-mode,.block-mode{background:#c63d1c;color:#fff}
-      .availability-shortcuts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 14px;font-size:12px;color:#47614d}
-      .availability-shortcuts button{min-height:34px;padding:6px 9px;font-size:12px}
-      .recurring-form{grid-template-columns:1fr 1fr 2fr 1fr 1fr auto}
-      .day-picker > div{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:44px}
-      .day-picker label{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:400}
-      .day-picker input{min-height:auto}
-      .availability-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
-      .availability-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;font-size:13px}
-      .availability-actions{display:flex;gap:6px;flex-shrink:0}
-      .availability-actions button,.readiness-card button{min-height:36px;padding:7px 10px;font-size:12px}
       .readiness-card{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;border-radius:10px;background:#eaf4eb;color:#17663d;font-size:13px;line-height:1.45}
-      .readiness-card button{margin-left:auto}
+      .readiness-card button{margin-left:auto;min-height:36px;padding:7px 10px;font-size:12px}
+      .readiness-card button,.availability-modes button{min-height:36px;padding:7px 10px;font-size:12px}
+      .availability-modes{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
+      .availability-modes .block-mode,.block-mode{background:#c63d1c;color:#fff}
       .readiness-warning{background:#fff3ed;color:#8c351f}
       .error-note{color:#a72c11 !important;font-size:13px;font-weight:700}
 
@@ -277,9 +307,13 @@ export function Styles() {
         .availability-list li{align-items:flex-start;flex-direction:column}
         .availability-actions{width:100%}
         .availability-actions button{flex:1}
-        .date-adder,.time-row,.daily-time{grid-template-columns:1fr}
-        .date-options{grid-template-columns:1fr}
         .assistant-actions button{flex:1}
+        .calendar-day{min-height:44px}
+        .calendar-day .date-label{display:none}
+        .selected-day-chip{flex-direction:column;align-items:flex-start}
+        .selected-day-chip-actions{width:100%}
+        .selected-day-chip-actions button{flex:1}
+        .pending-day-editor-header button{flex-shrink:0}
       }
     `}</style>
   );
