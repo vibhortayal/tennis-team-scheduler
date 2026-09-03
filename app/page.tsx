@@ -19,7 +19,6 @@ import {
   matchDateTime,
   currentDateInFremont,
   teamIds,
-  matchIncludesTeam,
   canUpdateMatch,
   existingFixture,
   matchesForTeam,
@@ -257,10 +256,21 @@ export default function Page() {
         headers,
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error('Could not save.');
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || `Request failed with status ${response.status}.`);
+      }
       await loadAvailability(identity);
-    } catch {
-      setAvailabilityError('Could not save your update.');
+    } catch (error) {
+      let message = 'Could not save your update.';
+      if (
+        error instanceof Error &&
+        error.message.includes('column player_availability.kind does not exist')
+      ) {
+        message =
+          'Could not save your update because the Supabase availability migration has not been applied.';
+      }
+      setAvailabilityError(message);
     } finally {
       setAvailabilitySaving(false);
     }
@@ -772,14 +782,7 @@ export default function Page() {
           copyMissingReminder={copyMissingReminder}
           partnerName={partnerName}
           partnerReady={partnerReady}
-          remainingMatchCount={
-            matches.filter(
-              (match) =>
-                (match.league_group || 'Group B') === scheduleGroup &&
-                matchIncludesTeam(match.matchup, suggestionTeam) &&
-                !['Completed', 'Cancelled'].includes(match.status)
-            ).length
-          }
+          remainingMatchCount={teamMatches.length}
         />
       )}
 
