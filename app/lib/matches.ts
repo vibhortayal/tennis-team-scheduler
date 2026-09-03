@@ -137,6 +137,23 @@ export const matchesForTeam = (allMatches: Match[], group: Group, teamId: string
       matchIncludesTeam(match.matchup, teamId)
   );
 
+export const pendingOpponentsForTeam = (allMatches: Match[], group: Group, teamId: string) => {
+  const opponents = groups[group]
+    .map(([opponentId]) => opponentId)
+    .filter((opponentId) => opponentId !== teamId);
+
+  return opponents.filter(
+    (opponentId) =>
+      !allMatches.some(
+        (match) =>
+          (match.league_group || 'Group B') === group &&
+          isBlockingStatus(match.status) &&
+          matchIncludesTeam(match.matchup, teamId) &&
+          matchIncludesTeam(match.matchup, opponentId)
+      )
+  );
+};
+
 export const restGapAroundDate = (teamMatches: Match[], date: string) => {
   const previous = teamMatches
     .filter((match) => match.match_date < date)

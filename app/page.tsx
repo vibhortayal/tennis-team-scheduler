@@ -22,6 +22,7 @@ import {
   canUpdateMatch,
   existingFixture,
   matchesForTeam,
+  pendingOpponentsForTeam,
   restGapAroundDate,
 } from './lib/matches';
 import { api, availabilityApi, supabaseKey as key, headers } from './lib/supabase';
@@ -313,6 +314,10 @@ export default function Page() {
 
   const standingsA = useMemo(() => computeStandings(matches, 'Group A'), [matches]);
   const standingsB = useMemo(() => computeStandings(matches, 'Group B'), [matches]);
+  const pendingOpponentIds = useMemo(
+    () => pendingOpponentsForTeam(matches, scheduleGroup, suggestionTeam),
+    [matches, scheduleGroup, suggestionTeam]
+  );
 
   const opponentOptions = useMemo(
     () => Array.from(new Set(suggestions.map((item) => item.opponentId))),
@@ -782,7 +787,8 @@ export default function Page() {
           copyMissingReminder={copyMissingReminder}
           partnerName={partnerName}
           partnerReady={partnerReady}
-          remainingMatchCount={teamMatches.length}
+          pendingMatchCount={pendingOpponentIds.length}
+          pendingOpponentIds={pendingOpponentIds}
         />
       )}
 

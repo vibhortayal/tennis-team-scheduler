@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeStandings, parseResultString } from '../app/lib/scoring.ts';
+import { pendingOpponentsForTeam } from '../app/lib/matches.ts';
 import type { Match } from '../app/lib/matches.ts';
 
 test('parseResultString handles the "Team #X def. Team #Y, A-B, C-D" prefix format', () => {
@@ -44,4 +45,39 @@ test('a completed match with a "Team #X def. Team #Y" result is counted in Group
   assert.equal(winner!.totalPoints, 2);
   assert.equal(loser!.matchesLost, 1);
   assert.equal(loser!.matchesPlayed, 1);
+});
+
+test('pending opponents exclude completed and scheduled matches but ignore cancelled matches', () => {
+  const matches: Match[] = [
+    {
+      id: '1',
+      matchup: 'Team #10 vs Team #1',
+      match_date: '2026-08-30',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'Completed',
+      result: '6-1, 6-4',
+      league_group: 'Group B',
+    },
+    {
+      id: '2',
+      matchup: 'Team #10 vs Team #3',
+      match_date: '2026-09-10',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'Scheduled',
+      league_group: 'Group B',
+    },
+    {
+      id: '3',
+      matchup: 'Team #10 vs Team #4',
+      match_date: '2026-09-11',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'Cancelled',
+      league_group: 'Group B',
+    },
+  ];
+
+  assert.deepEqual(pendingOpponentsForTeam(matches, 'Group B', '10'), ['4', '6', '8', '13']);
 });
