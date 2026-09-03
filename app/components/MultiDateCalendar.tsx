@@ -12,12 +12,20 @@ import {
   PickerType,
 } from '../lib/availabilityHelpers';
 
+export type DateParticipantStatus = {
+  available: string[];
+  blocked: string[];
+  missing: string[];
+};
+
 interface MultiDateCalendarProps {
   selectedDates: DateString[];
   onDateToggle: (date: DateString) => void;
   availabilityMap: Map<DateString, DayAvailability>;
   blockingMap: Map<DateString, DayBlock>;
   matchDates: DateString[];
+  participantStatusMap: Map<DateString, DateParticipantStatus>;
+  readOnly?: boolean;
   pickerType: PickerType;
   minDate?: Date;
   maxDate?: Date;
@@ -32,6 +40,8 @@ export function MultiDateCalendar({
   availabilityMap,
   blockingMap,
   matchDates,
+  participantStatusMap,
+  readOnly = false,
   pickerType,
   minDate,
   maxDate,
@@ -50,7 +60,7 @@ export function MultiDateCalendar({
 
   const handleDateClick = (date: Date) => {
     const info = getDateInfo(date);
-    if (isDateDisabled(info.state)) return;
+    if (readOnly || isDateDisabled(info.state)) return;
     onDateToggle(normalizeDate(date));
   };
 
@@ -88,6 +98,8 @@ export function MultiDateCalendar({
         selectedDates={selectedDates}
         onDateToggle={handleDateClick}
         getDateInfo={getDateInfo}
+        participantStatusMap={participantStatusMap}
+        readOnly={readOnly}
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
       />
@@ -100,6 +112,8 @@ interface CalendarGridProps {
   selectedDates: DateString[];
   onDateToggle: (date: Date) => void;
   getDateInfo: (date: Date) => { state: DateState; disabledReason: DisabledReason };
+  participantStatusMap: Map<DateString, DateParticipantStatus>;
+  readOnly: boolean;
   rangeStart: Date;
   rangeEnd: Date;
 }
@@ -109,6 +123,8 @@ function CalendarGrid({
   selectedDates,
   onDateToggle,
   getDateInfo,
+  participantStatusMap,
+  readOnly,
   rangeStart,
   rangeEnd,
 }: CalendarGridProps) {
@@ -156,6 +172,8 @@ function CalendarGrid({
               selectedDates={selectedDates}
               onDateToggle={onDateToggle}
               getDateInfo={getDateInfo}
+              participantStatusMap={participantStatusMap}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -169,9 +187,18 @@ interface CalendarDayProps {
   selectedDates: DateString[];
   onDateToggle: (date: Date) => void;
   getDateInfo: (date: Date) => { state: DateState; disabledReason: DisabledReason };
+  participantStatusMap: Map<DateString, DateParticipantStatus>;
+  readOnly: boolean;
 }
 
-function CalendarDay({ date, selectedDates, onDateToggle, getDateInfo }: CalendarDayProps) {
+function CalendarDay({
+  date,
+  selectedDates,
+  onDateToggle,
+  getDateInfo,
+  participantStatusMap,
+  readOnly,
+}: CalendarDayProps) {
   if (!date) {
     return <div className="calendar-day empty" aria-hidden="true" />;
   }
@@ -179,8 +206,9 @@ function CalendarDay({ date, selectedDates, onDateToggle, getDateInfo }: Calenda
   const dateStr = normalizeDate(date);
   const isSelected = selectedDates.includes(dateStr);
   const info = getDateInfo(date);
-  const disabled = isDateDisabled(info.state);
+  const disabled = readOnly || isDateDisabled(info.state);
   const reasonLabel = getDisabledReasonLabel(info.disabledReason);
+  const participants = participantStatusMap.get(dateStr);
   const stateLabel = isSelected
     ? 'Selected'
     : info.state === 'available' || info.state === 'available-anytime'
@@ -190,7 +218,21 @@ function CalendarDay({ date, selectedDates, onDateToggle, getDateInfo }: Calenda
         : info.state === 'match'
           ? 'Match day'
           : 'Selectable';
-  const title = reasonLabel ? `${formatTitle(date)} · ${reasonLabel}` : formatTitle(date);
+  const participantLabel = participants
+    ? [
+        participants.available.length ? `Available: ${participants.available.join(', ')}` : '',
+        participants.blocked.length ? `Blocked: ${participants.blocked.join(', ')}` : '',
+        participants.missing.length ? `No update: ${participants.missing.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+  const title = [
+    reasonLabel ? `${formatTitle(date)} · ${reasonLabel}` : formatTitle(date),
+    participantLabel,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <button
@@ -203,6 +245,18 @@ function CalendarDay({ date, selectedDates, onDateToggle, getDateInfo }: Calenda
     >
       <span className="date-number">{date.getDate()}</span>
       {reasonLabel && <span className="date-label">{reasonLabel}</span>}
+      {participants && (
+        <span className="date-participant-status" aria-hidden="true">
+          {participants.available.length > 0 && (
+            <span className="date-participant-available">
+              A: {participants.available.join(', ')}
+            </span>
+          )}
+          {participants.blocked.length > 0 && (
+            <span className="date-participant-blocked">B: {participants.blocked.join(', ')}</span>
+          )}
+        </span>
+      )}
     </button>
   );
 }

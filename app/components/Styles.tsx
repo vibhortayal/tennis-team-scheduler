@@ -8,7 +8,7 @@ export function Styles() {
       button{border:0;border-radius:9px;min-height:44px;padding:10px 14px;background:#147a42;color:white;font-weight:700;cursor:pointer}
       button:disabled{cursor:not-allowed;opacity:.55}
       .top,.hero,.card,form,.tabs{background:#fff;border:1px solid #e0e8df;border-radius:16px}
-      .top{padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+      .top{padding:18px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
       .identity-select{width:auto;min-width:190px;max-width:260px;background:#eaf4eb;color:#17663d;font-weight:700}
       .identity-picker{display:flex;align-items:center;gap:8px}
       .identity-picker-label{font-size:12px;font-weight:700;color:#17663d;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
@@ -19,7 +19,8 @@ export function Styles() {
       .next-matches{display:block}
       .wide-hero{width:100%}
       .wide-hero .eyebrow{margin-bottom:12px}
-      .group-schedule{margin:0 0 16px}
+      .top .group-schedule{display:block;margin:0;justify-self:center}
+      .top .identity-picker{justify-self:end}
       .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
       .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
       .filters{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
@@ -87,12 +88,24 @@ export function Styles() {
       .personal-stats{display:flex;gap:8px;flex-wrap:wrap}
       .personal-stats span{padding:6px 9px;border-radius:999px;background:#fff;color:#47614d;font-size:12px}
       .personal-stats b{color:#17663d}
+      .pending-matchups{display:grid;gap:9px;margin-top:12px;padding:12px;border:1px solid #cbdccd;border-radius:10px;background:#fff}
+      .pending-matchups-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+      .pending-matchup-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:#147a42;color:#fff;font-size:12px;font-weight:800}
+      .pending-matchup-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      .pending-matchups-hint{margin:0 !important;color:#5f7064 !important;font-size:12px}
+      .pending-matchup{display:flex;align-items:center;gap:8px;min-width:0;width:100%;padding:8px 9px;border:1px solid #d6dfd5;border-radius:8px;background:#f8fbf7;color:#15231a;text-align:left}
+      .pending-matchup.selected{border-color:#147a42;background:#eaf4eb;box-shadow:inset 0 0 0 1px #147a42}
+      .pending-matchup .team-number{min-width:30px;height:24px;padding:0 7px}
+      .pending-matchup .team-names{font-size:13px}
+      .pending-matchups-complete{margin:12px 0 0 !important;padding:10px 12px;border-radius:10px;background:#eaf4eb;color:#17663d !important;font-size:13px;font-weight:700}
       .suggestion-step{margin-top:18px}
       .suggestion-step h3{margin:0 0 8px;font-size:14px}
       .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
       .known-team{padding:12px;border:1px solid #cbdccd;border-radius:10px;background:#f1f7f1;color:#17663d;font-weight:800}
       .known-team small{display:block;margin-bottom:4px;color:#5f7064;font-size:11px;letter-spacing:.7px}
       .known-team-note{font-size:12px;color:#8a9d8e;margin-top:6px !important;font-weight:400}
+      .scheduling-tabs{display:flex;width:100%;gap:6px;margin:0 0 20px;padding-bottom:2px;border-bottom:1px solid #d6dfd5}
+      .scheduling-tabs button{flex:1;min-width:0;min-height:42px;padding:9px 12px;font-size:13px;text-align:center}
       .suggest-button{margin-top:16px}
       .suggestion-note{margin:14px 0 0;color:#17663d !important;font-weight:700}
       .suggestion-filter{margin-top:16px;max-width:360px}
@@ -122,6 +135,10 @@ export function Styles() {
       .calendar-day.empty{border:none;background:transparent;min-height:52px}
       .calendar-day .date-number{font-size:13px}
       .calendar-day .date-label{font-size:9px;font-weight:700;line-height:1.1;text-align:center}
+      .date-participant-status{display:grid;gap:1px;width:100%;font-size:8px;line-height:1.1;font-weight:700;text-align:left;overflow:hidden}
+      .date-participant-status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .date-participant-available{color:#17663d}
+      .date-participant-blocked{color:#a72c11}
       .calendar-day.state-normal{background:#fff}
       .calendar-day.state-available,
       .calendar-day.state-available-anytime{background:#eaf4eb;border-color:#147a42;color:#17663d}
@@ -288,6 +305,7 @@ export function Styles() {
         .tabs::-webkit-scrollbar{display:none}
         .tabs button{flex:0 0 auto;min-width:max-content}
         .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
+        .pending-matchup-list{grid-template-columns:1fr}
         .availability-form{grid-template-columns:1fr}
         .wide{grid-column:auto}
         .hero{display:block}
@@ -310,6 +328,7 @@ export function Styles() {
         .assistant-actions button{flex:1}
         .calendar-day{min-height:44px}
         .calendar-day .date-label{display:none}
+        .date-participant-status{font-size:7px}
         .selected-day-chip{flex-direction:column;align-items:flex-start}
         .selected-day-chip-actions{width:100%}
         .selected-day-chip-actions button{flex:1}
