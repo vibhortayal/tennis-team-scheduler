@@ -12,15 +12,7 @@ type SetRowProps = {
   optional?: boolean;
 };
 
-function SetRow({
-  label,
-  setKey,
-  teamALabel,
-  teamBLabel,
-  entry,
-  onChange,
-  optional,
-}: SetRowProps) {
+function SetRow({ label, setKey, teamALabel, teamBLabel, entry, onChange, optional }: SetRowProps) {
   const aKey = `${setKey}A` as keyof ScoreEntryState;
   const bKey = `${setKey}B` as keyof ScoreEntryState;
 
@@ -42,7 +34,7 @@ function SetRow({
             min="0"
             max="99"
             value={entry[aKey]}
-            onChange={e => onChange({ ...entry, [aKey]: e.target.value })}
+            onChange={(e) => onChange({ ...entry, [aKey]: e.target.value })}
             aria-label={`${label} games for ${teamALabel}`}
             className="score-input"
           />
@@ -56,7 +48,7 @@ function SetRow({
             min="0"
             max="99"
             value={entry[bKey]}
-            onChange={e => onChange({ ...entry, [bKey]: e.target.value })}
+            onChange={(e) => onChange({ ...entry, [bKey]: e.target.value })}
             aria-label={`${label} games for ${teamBLabel}`}
             className="score-input"
           />
@@ -78,13 +70,7 @@ export type ScoreEntryProps = {
   onChange: (next: ScoreEntryState) => void;
 };
 
-export function ScoreEntry({
-  teamALabel,
-  teamBLabel,
-  entry,
-  error,
-  onChange,
-}: ScoreEntryProps) {
+export function ScoreEntry({ teamALabel, teamBLabel, entry, error, onChange }: ScoreEntryProps) {
   return (
     <div className="score-entry wide">
       <div className="score-entry-header">
