@@ -256,10 +256,6 @@ export default function Page() {
     }
   };
 
-  const saveAvailabilityWindows = async (windows: Array<{ startsAt: string; endsAt: string }>) => {
-    for (const window of windows) await saveAvailability(window.startsAt, window.endsAt);
-  };
-
   const blockAvailability = async (startsAt: string, endsAt: string) => {
     if (!availabilityApi || !key) return;
     setAvailabilitySaving(true);
@@ -473,8 +469,19 @@ export default function Page() {
         ...playerKeysForTeam(scheduleGroup, opponentId),
       ];
       const windows = intersectTimeWindows(
-        participants.map((player) => mergeAvailabilitySlots(slotMap.get(player) || []))
+        participants
+          .filter((player) => (slotMap.get(player) || []).length > 0)
+          .map((player) => mergeAvailabilitySlots(slotMap.get(player) || []))
       );
+      const participantNames = groups[scheduleGroup]
+        .find(([id]) => id === suggestionTeam)?.[1]
+        .split(',')
+        .concat(groups[scheduleGroup].find(([id]) => id === opponentId)?.[1].split(',') || [])
+        .map((name) => name.trim());
+      const missingPlayers = participants
+        .map((player, index) => ({ player, name: participantNames[index] }))
+        .filter(({ player }) => !(slotMap.get(player) || []).length)
+        .map(({ name }) => name);
       const starts = windows
         .flatMap((window) => generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES))
         .filter(
@@ -501,11 +508,17 @@ export default function Page() {
           day: '2-digit',
         }).format(start);
 
-        const youHaveMatch = yourMatches.some((match) => match.match_date === date);
+        const hasScheduledConflict = [...yourMatches, ...opponentMatches].some((match) => {
+          if (match.match_date !== date || match.status.toLowerCase() !== 'scheduled') return false;
+          const matchStart = new Date(matchDateTime(match));
+          const matchEnd = new Date(matchStart.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000);
+          return (
+            start < matchEnd &&
+            start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000 > matchStart.valueOf()
+          );
+        });
 
-        const opponentHasMatch = opponentMatches.some((match) => match.match_date === date);
-
-        if (youHaveMatch || opponentHasMatch) {
+        if (hasScheduledConflict) {
           return;
         }
 
@@ -522,6 +535,8 @@ export default function Page() {
           startsAt: start.toISOString(),
           endsAt: new Date(start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000).toISOString(),
           alternateCount: Math.max(0, starts.length - 1),
+          missingPlayers,
+          allPlayersReady: missingPlayers.length === 0,
           yourGap,
           opponentGap,
           score: yourGap + opponentGap,
@@ -589,6 +604,13 @@ export default function Page() {
       `Hi ${partner} - I added my availability for our remaining league matches. Please add a few times you can play before September 30 so the scheduler can find overlaps with our opponents.`
     );
     setSuggestionNote(`Reminder copied for ${partner}.`);
+  };
+
+  const copyMissingReminder = async (names: string[]) => {
+    await navigator.clipboard?.writeText(
+      `Hi ${names.join(' and ')} - please add a few times you can play before September 30 so we can find a match time that works for everyone.`
+    );
+    setSuggestionNote(`Reminder copied for ${names.join(' and ')}.`);
   };
 
   const save = async (event: FormEvent, scores: ScoreEntryState) => {
@@ -761,9 +783,38 @@ export default function Page() {
           availabilityError={availabilityError}
           onAvailabilitySave={saveAvailability}
           onAvailabilityDelete={deleteAvailability}
-          onAvailabilityBulkSave={saveAvailabilityWindows}
           onAvailabilityBlock={blockAvailability}
+          scheduledDates={matches
+            .filter(
+              (match) =>
+                (match.league_group || 'Group B') === scheduleGroup &&
+                matchIncludesTeam(match.matchup, suggestionTeam) &&
+                match.status.toLowerCase() === 'scheduled'
+            )
+            .map((match) => match.match_date)}
+          scheduledTimes={matches
+            .filter(
+              (match) =>
+                (match.league_group || 'Group B') === scheduleGroup &&
+                matchIncludesTeam(match.matchup, suggestionTeam) &&
+                match.status.toLowerCase() === 'scheduled'
+            )
+            .map((match) => ({
+              date: match.match_date,
+              startsAt: match.match_time.slice(0, 5),
+              endsAt: new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'America/Los_Angeles',
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+              }).format(
+                new Date(
+                  new Date(matchDateTime(match)).valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60000
+                )
+              ),
+            }))}
           copyReminder={copyReminder}
+          copyMissingReminder={copyMissingReminder}
           partnerName={partnerName}
           partnerReady={partnerReady}
           remainingMatchCount={

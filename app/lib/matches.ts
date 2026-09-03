@@ -20,6 +20,8 @@ export type Suggestion = {
   startsAt?: string;
   endsAt?: string;
   alternateCount?: number;
+  missingPlayers?: string[];
+  allPlayersReady?: boolean;
   yourGap: number;
   opponentGap: number;
   score: number;

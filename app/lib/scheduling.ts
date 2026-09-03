@@ -3,6 +3,7 @@ import { Match, Suggestion, teamIds } from './matches';
 
 // September 30, 2026 at 11:59:59 PM in America/Los_Angeles (PDT).
 export const SEASON_DEADLINE = '2026-10-01T06:59:59.999Z';
+export const SEASON_DEADLINE_DATE = '2026-09-30';
 export const DEFAULT_MATCH_DURATION_MINUTES = 120;
 export const DEFAULT_SCHEDULING_INCREMENT_MINUTES = 30;
 

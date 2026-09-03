@@ -25,9 +25,11 @@ type SmartSchedulingProps = {
   availabilityError: string;
   onAvailabilitySave: (startsAt: string, endsAt: string, id?: string) => Promise<void>;
   onAvailabilityDelete: (id: string) => Promise<void>;
-  onAvailabilityBulkSave: (windows: Array<{ startsAt: string; endsAt: string }>) => Promise<void>;
   onAvailabilityBlock: (startsAt: string, endsAt: string) => Promise<void>;
+  scheduledDates: string[];
+  scheduledTimes: Array<{ date: string; startsAt: string; endsAt: string }>;
   copyReminder: () => void;
+  copyMissingReminder: (names: string[]) => void;
   partnerName: string;
   partnerReady: boolean;
   remainingMatchCount: number;
@@ -55,9 +57,11 @@ export function SmartScheduling({
   availabilityError,
   onAvailabilitySave,
   onAvailabilityDelete,
-  onAvailabilityBulkSave,
   onAvailabilityBlock,
+  scheduledDates,
+  scheduledTimes,
   copyReminder,
+  copyMissingReminder,
   partnerName,
   partnerReady,
   remainingMatchCount,
@@ -80,7 +84,7 @@ export function SmartScheduling({
           <h2>
             {identity.viewing
               ? 'Make match day easier'
-              : `Hi ${identity.name}, let&apos;s get your next match on the calendar.`}
+              : `Hi ${identity.name}, let's get your next match on the calendar.`}
           </h2>
         </div>
       </div>
@@ -107,7 +111,7 @@ export function SmartScheduling({
       </div>
       <div>
         <div className="eyebrow">SMART SCHEDULING</div>
-        <p>Keep your availability current and we&apos;ll surface times that work for everyone.</p>
+        <p>{"Keep your availability current and we'll surface times that work for everyone."}</p>
       </div>
 
       {identity.viewing ? (
@@ -136,8 +140,9 @@ export function SmartScheduling({
             error={availabilityError}
             onSave={onAvailabilitySave}
             onDelete={onAvailabilityDelete}
-            onBulkSave={onAvailabilityBulkSave}
             onBlock={onAvailabilityBlock}
+            scheduledDates={scheduledDates}
+            scheduledTimes={scheduledTimes}
           />
 
           {availability.length === 0 ? (
@@ -219,7 +224,7 @@ export function SmartScheduling({
                   className="card suggestion-card"
                   key={`${suggestion.opponentId}-${suggestion.date}`}
                 >
-                  <small>SUGGESTED MATCH</small>
+                  <small>{suggestion.allPlayersReady ? 'READY TO PROPOSE' : 'POSSIBLE TIME'}</small>
 
                   <div className="matchup">
                     <TeamContext group={scheduleGroup} id={suggestionTeam} matches={matches} />
@@ -267,7 +272,32 @@ export function SmartScheduling({
                     </p>
                   ) : null}
 
-                  <button onClick={() => onSchedule(suggestion)}>Propose this time</button>
+                  {!suggestion.allPlayersReady && suggestion.missingPlayers?.length ? (
+                    <p className="missing-availability">
+                      Waiting on {suggestion.missingPlayers.join(' and ')} to add availability.
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => copyMissingReminder(suggestion.missingPlayers || [])}
+                      >
+                        Copy reminder
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="ready-availability">All required players are available.</p>
+                  )}
+
+                  <button
+                    disabled={!suggestion.allPlayersReady}
+                    onClick={() => onSchedule(suggestion)}
+                    title={
+                      suggestion.allPlayersReady
+                        ? 'Open the proposal flow'
+                        : 'Waiting for all players to add availability'
+                    }
+                  >
+                    {suggestion.allPlayersReady ? 'Propose this time' : 'Waiting for availability'}
+                  </button>
                 </article>
               ))}
             </div>

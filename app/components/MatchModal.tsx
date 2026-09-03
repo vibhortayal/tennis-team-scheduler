@@ -28,7 +28,7 @@ export function IdentityPrompt({
         <h2 id="identity-heading">Welcome! Select your player</h2>
         <p>
           Choose the player you&apos;re scheduling for. You can switch players anytime from the
-          top-right menu.
+          menu.
         </p>
         <label className="field">
           Player
