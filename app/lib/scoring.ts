@@ -132,8 +132,9 @@ export function parseResultString(result: string): MatchScores | null {
   if (parts.length < 2) return null;
   const parsed: SetScore[] = [];
   for (const part of parts) {
-    const match = /^(\d+)-(\d+)$/.exec(part);
-    if (!match) return null;
+    // Skip non-score segments like the "Team #9 def. Team #11" winner prefix.
+    const match = /(\d+)-(\d+)/.exec(part);
+    if (!match) continue;
     const teamA = Number(match[1]);
     const teamB = Number(match[2]);
     if (!Number.isSafeInteger(teamA) || !Number.isSafeInteger(teamB) || teamA === teamB) {
