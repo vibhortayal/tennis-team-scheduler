@@ -628,26 +628,6 @@ export default function Page() {
     setNote('');
   };
 
-  const copyReminder = async () => {
-    const partner =
-      groups[scheduleGroup]
-        .find(([id]) => id === suggestionTeam)?.[1]
-        .split(',')
-        .map((name) => name.trim())
-        .find((name) => name !== identity.name) || 'your partner';
-    await navigator.clipboard?.writeText(
-      `Hi ${partner} - I added my availability for our remaining league matches. Please add a few times you can play before September 30 so the scheduler can find overlaps with our opponents.`
-    );
-    setSuggestionNote(`Reminder copied for ${partner}.`);
-  };
-
-  const copyMissingReminder = async (names: string[]) => {
-    await navigator.clipboard?.writeText(
-      `Hi ${names.join(' and ')} - please add a few times you can play before September 30 so we can find a match time that works for everyone.`
-    );
-    setSuggestionNote(`Reminder copied for ${names.join(' and ')}.`);
-  };
-
   const save = async (event: FormEvent, scores: ScoreEntryState) => {
     event.preventDefault();
 
@@ -824,8 +804,6 @@ export default function Page() {
           availabilityError={availabilityError}
           onSaveSlot={saveSlot}
           onDeleteSlot={deleteSlot}
-          copyReminder={copyReminder}
-          copyMissingReminder={copyMissingReminder}
           partnerName={partnerName}
           partnerReady={partnerReady}
           pendingMatchCount={pendingOpponentIds.length}

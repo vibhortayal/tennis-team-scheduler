@@ -29,8 +29,6 @@ type SmartSchedulingProps = {
   availabilityError: string;
   onSaveSlot: (input: SlotSaveInput) => Promise<void>;
   onDeleteSlot: (id: string) => Promise<void>;
-  copyReminder: () => void;
-  copyMissingReminder: (names: string[]) => void;
   partnerName: string;
   partnerReady: boolean;
   pendingMatchCount: number;
@@ -65,8 +63,6 @@ export function SmartScheduling({
   availabilityError,
   onSaveSlot,
   onDeleteSlot,
-  copyReminder,
-  copyMissingReminder,
   partnerName,
   partnerReady,
   pendingMatchCount,
@@ -217,24 +213,12 @@ export function SmartScheduling({
               <div className="readiness-card readiness-warning" role="status">
                 <b>Your availability is saved.</b> {partnerName} still needs to add availability
                 before we can find shared match times.
-                <button type="button" className="secondary" onClick={copyReminder}>
-                  Copy reminder
-                </button>
               </div>
             ) : (
               <div className="readiness-card" role="status">
                 <b>Your team is ready.</b>{' '}
                 {opponentMissingNames.length > 0 ? (
-                  <>
-                    Availability is still needed from {opponentMissingNames.join(' and ')}.
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => copyMissingReminder(opponentMissingNames)}
-                    >
-                      Copy reminder
-                    </button>
-                  </>
+                  <>Availability is still needed from {opponentMissingNames.join(' and ')}.</>
                 ) : (
                   'All opponents in your remaining matches have entered availability.'
                 )}
@@ -354,13 +338,6 @@ export function SmartScheduling({
                     {!suggestion.allPlayersReady && suggestion.missingPlayers?.length ? (
                       <p className="missing-availability">
                         Availability is still needed from {suggestion.missingPlayers.join(' and ')}.
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() => copyMissingReminder(suggestion.missingPlayers || [])}
-                        >
-                          Copy reminder
-                        </button>
                       </p>
                     ) : (
                       <p className="ready-availability">All players available - schedule now.</p>
