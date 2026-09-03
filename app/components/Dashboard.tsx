@@ -1,5 +1,5 @@
 import { Group, Identity, groups, teamDisplay } from '../teams';
-import { Match, dateText, canUpdateMatch } from '../lib/matches';
+import { Match, dateText, canUpdateMatch, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
 
 type DashboardProps = {
@@ -40,16 +40,22 @@ export function Dashboard({
   onEdit,
 }: DashboardProps) {
   const roster = groups[group];
+  const filteredNextMatches = nextMatches.filter(
+    (match) =>
+      (filter === 'All' || match.status === filter) &&
+      (!team || teamIds(match, group).includes(team))
+  );
+  const showNextMatches = filter === 'All' || filter === 'Scheduled';
 
   return (
     <>
-      {nextMatches.length > 0 ? (
+      {showNextMatches && filteredNextMatches.length > 0 ? (
         <section className="hero next-matches">
           <div className="wide-hero">
             <div className="eyebrow">NEXT MATCH · {dateText(nextMatchDate)}</div>
 
             <div className="grid">
-              {nextMatches.map((match) => {
+              {filteredNextMatches.map((match) => {
                 const matchGroup = (match.league_group || 'Group B') as Group;
 
                 return (

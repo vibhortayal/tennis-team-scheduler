@@ -31,7 +31,8 @@ type SmartSchedulingProps = {
   copyMissingReminder: (names: string[]) => void;
   partnerName: string;
   partnerReady: boolean;
-  remainingMatchCount: number;
+  pendingMatchCount: number;
+  pendingOpponentIds: string[];
 };
 
 export function SmartScheduling({
@@ -62,7 +63,8 @@ export function SmartScheduling({
   copyMissingReminder,
   partnerName,
   partnerReady,
-  remainingMatchCount,
+  pendingMatchCount,
+  pendingOpponentIds,
 }: SmartSchedulingProps) {
   const initials = identity.name
     .split(' ')
@@ -94,7 +96,7 @@ export function SmartScheduling({
             <p>Your personal match helper for the {scheduleGroup} league.</p>
             <div className="personal-stats">
               <span>
-                <b>{remainingMatchCount}</b> remaining match{remainingMatchCount === 1 ? '' : 'es'}
+                <b>{pendingMatchCount}</b> to be scheduled
               </span>
               <span>
                 <b>{partnerName}</b> partner
@@ -104,6 +106,13 @@ export function SmartScheduling({
                 {availabilitySlots.length === 1 ? '' : 's'}
               </span>
             </div>
+            <p className="pending-opponents">
+              {pendingOpponentIds.length > 0
+                ? `Pending with: ${pendingOpponentIds
+                    .map((id) => teamDisplay(scheduleGroup, id))
+                    .join(', ')}`
+                : 'All team matchups are scheduled or completed.'}
+            </p>
           </>
         )}
       </div>
