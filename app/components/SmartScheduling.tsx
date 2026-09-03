@@ -226,7 +226,7 @@ export function SmartScheduling({
                 <b>Your team is ready.</b>{' '}
                 {opponentMissingNames.length > 0 ? (
                   <>
-                    We are waiting on {opponentMissingNames.join(' and ')} to enter availability.
+                    Availability is still needed from {opponentMissingNames.join(' and ')}.
                     <button
                       type="button"
                       className="secondary"
@@ -353,7 +353,7 @@ export function SmartScheduling({
 
                     {!suggestion.allPlayersReady && suggestion.missingPlayers?.length ? (
                       <p className="missing-availability">
-                        Waiting on {suggestion.missingPlayers.join(' and ')} to add availability.
+                        Availability is still needed from {suggestion.missingPlayers.join(' and ')}.
                         <button
                           type="button"
                           className="secondary"
@@ -363,7 +363,7 @@ export function SmartScheduling({
                         </button>
                       </p>
                     ) : (
-                      <p className="ready-availability">All required players are available.</p>
+                      <p className="ready-availability">All players available - schedule now.</p>
                     )}
 
                     <button
@@ -372,12 +372,12 @@ export function SmartScheduling({
                       title={
                         suggestion.allPlayersReady
                           ? 'Open the proposal flow'
-                          : 'Waiting for all players to add availability'
+                          : 'Confirmed by players over chat'
                       }
                     >
                       {suggestion.allPlayersReady
                         ? 'Propose this time'
-                        : 'Waiting for availability'}
+                        : 'Confirmed by players over chat'}
                     </button>
                   </article>
                 ))}
