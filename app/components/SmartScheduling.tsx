@@ -419,7 +419,7 @@ export function SmartScheduling({
               <h3>Set rest-day rules</h3>
               <div className="suggestion-fields">
                 <label className="field">
-                  Minimum days after your last match
+                  Minimum days before and after your matches
                   <select value={yourGapDays} onChange={(e) => onYourGap(Number(e.target.value))}>
                     {[1, 2, 3, 4, 5, 6, 7].map((days) => (
                       <option value={days} key={days}>
@@ -430,7 +430,7 @@ export function SmartScheduling({
                 </label>
 
                 <label className="field">
-                  Minimum days after opponent&apos;s last match
+                  Minimum days before and after opponent matches
                   <select
                     value={opponentGapDays}
                     onChange={(e) => onOpponentGap(Number(e.target.value))}
