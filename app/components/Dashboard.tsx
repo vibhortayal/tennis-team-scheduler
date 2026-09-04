@@ -18,6 +18,7 @@ type DashboardProps = {
   onTeamChange: (team: string) => void;
   onEdit: (match: Match) => void;
   onAddTeam?: () => void;
+  onManageTeams?: () => void;
 };
 
 export function Dashboard({
@@ -36,6 +37,7 @@ export function Dashboard({
   onTeamChange,
   onEdit,
   onAddTeam,
+  onManageTeams,
 }: DashboardProps) {
   const currentRoster = roster || groups[group];
   const currentRosters = rosters || groups;
@@ -132,6 +134,17 @@ export function Dashboard({
             title="Add a new team to the league"
           >
             + Add Team
+          </button>
+        )}
+
+        {onManageTeams && (
+          <button
+            type="button"
+            className="manage-teams-filter-btn"
+            onClick={onManageTeams}
+            title="Withdraw or reactivate teams"
+          >
+            ⚙ Manage Teams
           </button>
         )}
       </div>

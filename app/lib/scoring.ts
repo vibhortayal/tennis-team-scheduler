@@ -228,22 +228,40 @@ function gamesForTeam(result: string, isTeamA: boolean): { won: number; lost: nu
   return { won, lost };
 }
 
+export function getEffectiveStandingsMatch(match: Match): Match | null {
+  if (match.excluded_from_standings || match.status === 'voided') {
+    return null;
+  }
+
+  if (match.standings_override?.reason === 'team_withdrawal') {
+    // Return a dummy match with the walkover score so the rest of the logic sees a 6-0, 6-0 win for the opponent
+    const { winnerTeamId, loserTeamId, score } = match.standings_override;
+    return {
+      ...match,
+      result: `${score.set1.teamA}-${score.set1.teamB}, ${score.set2.teamA}-${score.set2.teamB}`,
+      // Make sure the match matchup reflects the winner/loser clearly for parsing
+      matchup: `Team #${winnerTeamId} vs Team #${loserTeamId}`,
+    };
+  }
+
+  return match;
+}
+
 export function computeStandings(
   allMatches: Match[],
   group: Group,
   customRoster?: readonly Team[]
 ): TeamStandingRow[] {
   const roster = customRoster || groups[group];
-  const total = Math.max(0, roster.length - 1);
+  const activeTeamsCount = roster.length;
+  const total = Math.max(0, activeTeamsCount - 1);
 
-  // Only completed matches with parseable results
-  const completedMatches = allMatches.filter(
-    (m) =>
-      (m.league_group || 'Group B') === group &&
-      m.status === 'Completed' &&
-      !!m.result?.trim() &&
-      parseResultString(m.result) !== null
-  );
+  const effectiveMatches = allMatches
+    .filter((m) => (m.league_group || 'Group B') === group && m.status === 'Completed')
+    .map(getEffectiveStandingsMatch)
+    .filter(
+      (m): m is Match => m !== null && !!m.result?.trim() && parseResultString(m.result) !== null
+    );
 
   const rows: TeamStandingRow[] = roster.map(([teamId, names]) => {
     const [first, second] = names.split(',').map((n) => n.trim());
@@ -255,11 +273,17 @@ export function computeStandings(
     let gamesWon = 0;
     let gamesLost = 0;
 
-    for (const m of completedMatches) {
+    for (const m of effectiveMatches) {
+      // For walkovers we rewrote the matchup string to "Team #winner vs Team #loser"
+      // Wait, teamIds(m, group) might fail if the loser is not in the active roster
+      // matchIncludesTeam checks for "Team #10" anywhere in the string.
       if (!matchIncludesTeam(m.matchup, teamId)) continue;
 
-      const ids = teamIds(m, group);
-      const isTeamA = ids[0] === teamId;
+      const ids = teamIds(m, group, roster); // use current roster to resolve IDs, or allKnownTeams
+      const isTeamA =
+        ids.length > 0
+          ? ids[0] === teamId
+          : m.matchup.indexOf(`Team #${teamId}`) < m.matchup.indexOf('vs');
       const winner = matchWinner(m.result!);
 
       if (winner === 'a') {

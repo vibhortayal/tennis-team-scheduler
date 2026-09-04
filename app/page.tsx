@@ -29,6 +29,7 @@ import {
   matchesForTeam,
   pendingOpponentsForTeam,
   restGapAroundDate,
+  isBlockingStatus,
 } from './lib/matches';
 import { api, availabilityApi, teamsApi, supabaseKey as key, headers } from './lib/supabase';
 import {
@@ -53,6 +54,7 @@ import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
 import { DateParticipantStatus } from './components/MultiDateCalendar';
 import { AddTeamModal } from './components/AddTeamModal';
+import { ManageTeamsModal, WithdrawalResolution } from './components/ManageTeamsModal';
 import { getActiveRoster, NewTeamInput, validateNewTeam } from './lib/teamValidation';
 
 type View = 'dashboard' | 'scheduling' | 'standings';
@@ -65,6 +67,7 @@ export default function Page() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<TeamRecord[]>([...initialStaticTeams]);
   const [addTeamOpen, setAddTeamOpen] = useState(false);
+  const [manageTeamsOpen, setManageTeamsOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
   const [first, setFirst] = useState('');
@@ -263,6 +266,157 @@ export default function Page() {
     });
 
     setNote(`Team #${teamNumber} (${playerNames}) added successfully to ${teamGroup}.`);
+    return { ok: true };
+  };
+
+  const updateTeamStatus = async (
+    teamId: string,
+    newStatus: 'active' | 'withdrawn',
+    resolution?: WithdrawalResolution
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (teamsApi && key) {
+      try {
+        const response = await fetch(`${teamsApi}?team_number=eq.${encodeURIComponent(teamId)}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          return {
+            ok: false,
+            error: `Could not update team status: ${errText || response.statusText}`,
+          };
+        }
+
+        if (newStatus === 'withdrawn' && resolution && api) {
+          const teamMatches = matches.filter((m) => m.matchup.includes(`Team #${teamId}`));
+
+          for (const m of teamMatches) {
+            const isCompleted =
+              m.status === 'Completed' || m.status === 'Retired' || m.status === 'Walkover';
+            let patchBody: Record<string, unknown> = {};
+
+            if (resolution === 'walkover_all_opponents') {
+              const ids = teamIds(
+                m,
+                m.league_group || 'Group B',
+                groups[m.league_group || 'Group B']
+              );
+              const opponentId = ids.find((id) => id !== teamId) || '';
+
+              if (isCompleted) {
+                patchBody = {
+                  standings_override: {
+                    reason: 'team_withdrawal',
+                    winnerTeamId: opponentId,
+                    loserTeamId: teamId,
+                    score: { set1: { teamA: 6, teamB: 0 }, set2: { teamA: 6, teamB: 0 } },
+                  },
+                };
+              } else {
+                patchBody = {
+                  status: 'Walkover',
+                  cancellation_reason: 'team_withdrawal',
+                  standings_override: {
+                    reason: 'team_withdrawal',
+                    winnerTeamId: opponentId,
+                    loserTeamId: teamId,
+                    score: { set1: { teamA: 6, teamB: 0 }, set2: { teamA: 6, teamB: 0 } },
+                  },
+                  result: '6-0, 6-0',
+                };
+              }
+            } else if (resolution === 'void_tournament_records') {
+              if (isCompleted) {
+                patchBody = { excluded_from_standings: true };
+              } else {
+                patchBody = {
+                  status: 'Cancelled',
+                  cancellation_reason: 'team_removed_from_tournament',
+                  excluded_from_standings: true,
+                };
+              }
+            }
+
+            if (Object.keys(patchBody).length > 0) {
+              await fetch(`${api}?id=eq.${m.id}`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify(patchBody),
+              });
+            }
+          }
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          error: `Network error: ${err instanceof Error ? err.message : 'Unknown error.'}`,
+        };
+      }
+    }
+
+    setAllTeams((prev) => {
+      const updated = prev.map((t) => (t.teamId === teamId ? { ...t, status: newStatus } : t));
+      updateTeamRegistry(updated);
+      return updated;
+    });
+
+    await load(); // Reload matches to get updated overrides
+
+    const label = newStatus === 'withdrawn' ? 'withdrawn from' : 'reactivated in';
+    setNote(`Team #${teamId} has been ${label} the league.`);
+    return { ok: true };
+  };
+
+  const moveTeamGroup = async (
+    teamId: string,
+    newGroup: Group
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (teamsApi && key && api) {
+      try {
+        const teamMatches = matches.filter(
+          (m) => m.matchup.includes(`Team #${teamId}`) && !isBlockingStatus(m.status)
+        );
+
+        const response = await fetch(`${teamsApi}?team_number=eq.${encodeURIComponent(teamId)}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ league_group: newGroup }),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          return { ok: false, error: `Could not move team: ${errText || response.statusText}` };
+        }
+
+        // Cancel all unplayed matches
+        for (const m of teamMatches) {
+          await fetch(`${api}?id=eq.${m.id}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({
+              status: 'Cancelled',
+              cancellation_reason: 'team_moved_groups',
+              excluded_from_standings: true,
+            }),
+          });
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          error: `Network error: ${err instanceof Error ? err.message : 'Unknown error.'}`,
+        };
+      }
+    }
+
+    setAllTeams((prev) => {
+      const updated = prev.map((t) => (t.teamId === teamId ? { ...t, group: newGroup } : t));
+      updateTeamRegistry(updated);
+      return updated;
+    });
+
+    await load();
+    setNote(`Team #${teamId} has been moved to ${newGroup}.`);
     return { ok: true };
   };
 
@@ -677,7 +831,9 @@ export default function Page() {
       ];
       const windows = intersectTimeWindows(
         participants
-          .filter((player) => (slotMap.get(player) || []).length > 0)
+          .filter((player) =>
+            (slotMap.get(player) || []).some((s) => (s.kind ?? 'available') === 'available')
+          )
           .map((player) => effectiveWindowsForPlayer(slotMap.get(player) || []))
       );
       const participantNames = scheduleRoster
@@ -925,9 +1081,20 @@ export default function Page() {
           <button className="group-schedule" onClick={startScheduling}>
             Schedule match
           </button>
-          <button type="button" className="add-team-btn" onClick={() => setAddTeamOpen(true)}>
-            + Add Team
-          </button>
+          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
+            <button type="button" className="add-team-btn" onClick={() => setAddTeamOpen(true)}>
+              + Add Team
+            </button>
+          )}
+          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
+            <button
+              type="button"
+              className="manage-teams-btn"
+              onClick={() => setManageTeamsOpen(true)}
+            >
+              ⚙ Manage
+            </button>
+          )}
         </div>
 
         <PlayerPicker identity={identity} onChange={chooseIdentity} players={activePlayers} />
@@ -974,7 +1141,16 @@ export default function Page() {
           onFilterChange={setFilter}
           onTeamChange={setTeam}
           onEdit={begin}
-          onAddTeam={() => setAddTeamOpen(true)}
+          onAddTeam={
+            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
+              ? () => setAddTeamOpen(true)
+              : undefined
+          }
+          onManageTeams={
+            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
+              ? () => setManageTeamsOpen(true)
+              : undefined
+          }
         />
       ) : view === 'standings' ? (
         <StandingsView
@@ -1059,6 +1235,15 @@ export default function Page() {
         existingTeams={allTeams}
         onClose={() => setAddTeamOpen(false)}
         onSave={saveNewTeam}
+      />
+
+      <ManageTeamsModal
+        isOpen={manageTeamsOpen}
+        allTeams={allTeams}
+        allMatches={matches}
+        onClose={() => setManageTeamsOpen(false)}
+        onToggle={updateTeamStatus}
+        onMoveTeam={moveTeamGroup}
       />
     </main>
   );

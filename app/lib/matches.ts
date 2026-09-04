@@ -1,5 +1,15 @@
 import { Group, groups, Identity, Team, allKnownTeams } from '../teams';
 
+export type StandingsOverride = {
+  reason: string;
+  winnerTeamId: string;
+  loserTeamId: string;
+  score: {
+    set1: { teamA: number; teamB: number };
+    set2: { teamA: number; teamB: number };
+  };
+};
+
 export type Match = {
   id: string;
   matchup: string;
@@ -10,6 +20,8 @@ export type Match = {
   result?: string | null;
   cancellation_reason?: string | null;
   league_group?: Group;
+  excluded_from_standings?: boolean;
+  standings_override?: StandingsOverride | null;
 };
 
 export type Draft = Omit<Match, 'id'>;

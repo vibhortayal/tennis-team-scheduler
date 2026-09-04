@@ -298,3 +298,28 @@ export const hasOverlappingWindows = (
   availabilityMap: Map<DateString, DayAvailability>,
   blockingMap: Map<DateString, DayBlock>
 ): boolean => !validateAvailabilityBlockingConflict(dateStr, availabilityMap, blockingMap).valid;
+
+/**
+ * Eligibility rule for match search / smart scheduling.
+ *
+ * A team remains visible (eligible) for a searched date unless at least one
+ * of its players has *explicitly* submitted a blocked/unavailable record for
+ * that date.  A missing availability record ("unknown") does NOT disqualify a
+ * team — only an explicit block does.
+ *
+ * Decision table:
+ *   Both players available           → eligible
+ *   One available, one no-record     → eligible
+ *   Neither has a record             → eligible
+ *   Any player explicitly blocked    → NOT eligible
+ */
+export const isTeamEligibleForDate = (
+  teamPlayerKeys: string[],
+  slotsByPlayer: Map<string, { kind?: string; startsAt: string }[]>,
+  date: DateString
+): boolean =>
+  !teamPlayerKeys.some((playerKey) =>
+    (slotsByPlayer.get(playerKey) || []).some(
+      (slot) => (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
+    )
+  );

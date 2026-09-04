@@ -30,6 +30,12 @@ export type SlotSaveInput = {
   endsAt: string;
 };
 
+export type TeamPlayerContext = {
+  teamId: string;
+  displayName: string;
+  players: { key: string; name: string }[];
+};
+
 type AvailabilityManagerProps = {
   availabilitySlots: AvailabilitySlot[];
   blockingSlots: AvailabilitySlot[];
@@ -41,6 +47,10 @@ type AvailabilityManagerProps = {
   error: string;
   onSaveSlot: (input: SlotSaveInput) => Promise<void>;
   onDeleteSlot: (id: string) => Promise<void>;
+  /** When readOnly, describes each selected team + their player keys for the details panel. */
+  teamAvailabilityContext?: TeamPlayerContext[];
+  /** Full availability records for all players (used in readOnly date-details panel). */
+  allAvailability?: AvailabilitySlot[];
 };
 
 type PendingConfig = { mode: string; windows: string[] };
@@ -57,6 +67,8 @@ export function AvailabilityManager({
   error,
   onSaveSlot,
   onDeleteSlot,
+  teamAvailabilityContext,
+  allAvailability,
 }: AvailabilityManagerProps) {
   const [activeTab, setActiveTab] = useState<PickerType>('availability');
   const matchDates = useMemo(() => getMatchDates(teamMatches), [teamMatches]);
@@ -138,6 +150,8 @@ export function AvailabilityManager({
           saving={saving}
           onSubmit={submitAvailability}
           onDeleteSlot={onDeleteSlot}
+          teamAvailabilityContext={teamAvailabilityContext}
+          allAvailability={allAvailability}
         />
       </div>
       <div className={!readOnly && activeTab === 'blocking' ? '' : 'hidden'}>
@@ -154,6 +168,8 @@ export function AvailabilityManager({
           saving={saving}
           onSubmit={submitBlocking}
           onDeleteSlot={onDeleteSlot}
+          teamAvailabilityContext={teamAvailabilityContext}
+          allAvailability={allAvailability}
         />
       </div>
     </div>
@@ -173,6 +189,8 @@ function PickerSection({
   saving,
   onSubmit,
   onDeleteSlot,
+  teamAvailabilityContext,
+  allAvailability,
 }: {
   pickerType: PickerType;
   savedSlots: AvailabilitySlot[];
@@ -186,10 +204,46 @@ function PickerSection({
   saving: boolean;
   onSubmit: (entries: PendingEntry[]) => Promise<void>;
   onDeleteSlot: (id: string) => Promise<void>;
+  teamAvailabilityContext?: TeamPlayerContext[];
+  allAvailability?: AvailabilitySlot[];
 }) {
   const [pendingDates, setPendingDates] = useState<DateString[]>([]);
   const [configs, setConfigs] = useState<Record<DateString, PendingConfig>>({});
   const [localError, setLocalError] = useState('');
+  const [selectedDetailDate, setSelectedDetailDate] = useState<DateString | null>(null);
+
+  // Per-player status for the selected date in readOnly mode
+  const dateDetails = useMemo(() => {
+    if (!readOnly || !selectedDetailDate || !teamAvailabilityContext || !allAvailability)
+      return null;
+    return teamAvailabilityContext.map((team) => ({
+      teamId: team.teamId,
+      displayName: team.displayName,
+      players: team.players.map((player) => {
+        const playerSlots = allAvailability.filter(
+          (slot) =>
+            slot.playerId === player.key && normalizeDate(slot.startsAt) === selectedDetailDate
+        );
+        const hasAvailable = playerSlots.some((s) => (s.kind ?? 'available') === 'available');
+        const hasBlocked = playerSlots.some((s) => (s.kind ?? 'available') === 'blocked');
+        const status: 'available' | 'blocked' | 'no-response' = hasBlocked
+          ? 'blocked'
+          : hasAvailable
+            ? 'available'
+            : 'no-response';
+        return { name: player.name, status };
+      }),
+    }));
+  }, [readOnly, selectedDetailDate, teamAvailabilityContext, allAvailability]);
+
+  const formattedDetailDate = useMemo(() => {
+    if (!selectedDetailDate) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(`${selectedDetailDate}T12:00:00`));
+  }, [selectedDetailDate]);
 
   const defaultMode = pickerType === 'availability' ? 'anytime' : 'all_day';
   const modeOptions =
@@ -204,6 +258,11 @@ function PickerSection({
         ];
 
   const toggleDate = (date: DateString) => {
+    if (readOnly) {
+      // In readOnly mode, clicks drive the date-details panel, not pending edits.
+      setSelectedDetailDate((prev) => (prev === date ? null : date));
+      return;
+    }
     setLocalError('');
     if (pendingDates.includes(date)) {
       setPendingDates((current) => current.filter((d) => d !== date));
@@ -337,7 +396,7 @@ function PickerSection({
   return (
     <div className="picker-section">
       <MultiDateCalendar
-        selectedDates={pendingDates}
+        selectedDates={readOnly && selectedDetailDate ? [selectedDetailDate] : pendingDates}
         onDateToggle={toggleDate}
         availabilityMap={availabilityMap}
         blockingMap={blockingMap}
@@ -349,6 +408,49 @@ function PickerSection({
         maxDate={maxDate}
       />
       <DateStateLegend pickerType={pickerType} />
+
+      {/* Read-only date details panel */}
+      {readOnly && (
+        <div className="availability-date-details" aria-live="polite">
+          {!teamAvailabilityContext?.length ? (
+            <p className="availability-date-details-hint">
+              Select opponent teams above to compare availability.
+            </p>
+          ) : !selectedDetailDate ? (
+            <p className="availability-date-details-hint">
+              Click a date on the calendar to see player availability details.
+            </p>
+          ) : (
+            <div className="availability-date-details-content">
+              <h4 id="avail-detail-heading" className="availability-date-details-heading">
+                Availability for {formattedDetailDate}
+              </h4>
+              {dateDetails?.map((team) => (
+                <div key={team.teamId} className="avail-detail-team">
+                  <div className="avail-detail-team-name">{team.displayName}</div>
+                  <ul className="avail-detail-players">
+                    {team.players.map((player) => (
+                      <li
+                        key={player.name}
+                        className={`avail-detail-player avail-status-${player.status}`}
+                      >
+                        <span className="avail-player-name">{player.name}</span>
+                        <span className="avail-player-status">
+                          {player.status === 'available'
+                            ? '✓ Available'
+                            : player.status === 'blocked'
+                              ? '✗ Blocked'
+                              : '— No response'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!readOnly && pendingDates.length > 0 && (
         <div className="pending-day-editors">

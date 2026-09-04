@@ -124,13 +124,32 @@ export function SmartScheduling({
     });
     return map;
   }, [allAvailability]);
+  const teamAvailabilityContext = useMemo(() => {
+    const teamsToShow = [suggestionTeam, ...availabilityOpponents].filter(Boolean);
+    return teamsToShow.map((teamId) => {
+      const playerKeys = playerKeysForTeam(scheduleGroup, teamId);
+      const playerNames = playerKeys.map((key) => key.split(':').slice(2).join(':'));
+      return {
+        teamId,
+        displayName: `Team #${teamId}${playerNames.length ? ` \u2014 ${playerNames.join(' / ')}` : ''}`,
+        players: playerKeys.map((key, i) => ({ key, name: playerNames[i] })),
+      };
+    });
+  }, [scheduleGroup, suggestionTeam, availabilityOpponents]);
+
   const availableTeamsForSlot = useMemo(() => {
     if (!selectedSlotRange || !slotHasMatchDuration || !suggestionTeam) return [];
     const canPlayWithinSlot = (participantKeys: string[]) => {
-      const participantWindows = participantKeys.map((playerKey) => {
-        const slots = availabilityByPlayer.get(playerKey) || [];
-        return effectiveWindowsForPlayer(slots);
-      });
+      // Only include players who have submitted at least one available slot.
+      // Players with no record are treated as "unknown" (not unavailable),
+      // so they are excluded from the intersection rather than zeroing it out.
+      const participantWindows = participantKeys
+        .filter((playerKey) =>
+          (availabilityByPlayer.get(playerKey) || []).some(
+            (s) => (s.kind ?? 'available') === 'available'
+          )
+        )
+        .map((playerKey) => effectiveWindowsForPlayer(availabilityByPlayer.get(playerKey) || []));
       const sharedWindows = intersectTimeWindows(participantWindows);
       return sharedWindows.some((window) =>
         generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES).some((start) => {
@@ -305,6 +324,8 @@ export function SmartScheduling({
             error={availabilityError}
             onSaveSlot={onSaveSlot}
             onDeleteSlot={onDeleteSlot}
+            teamAvailabilityContext={teamAvailabilityContext}
+            allAvailability={allAvailability}
           />
 
           <div className={schedulingTab === 'overview' ? '' : 'hidden'}>

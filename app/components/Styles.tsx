@@ -22,7 +22,29 @@ export function Styles() {
       .header-actions{display:flex;align-items:center;gap:8px;justify-self:center}
       .top .group-schedule{display:block;margin:0}
       .add-team-btn{background:#17663d;color:#fff;display:inline-flex;align-items:center;gap:4px}
+      .manage-teams-btn{background:#3b5f47;color:#fff;display:inline-flex;align-items:center;gap:4px}
       .add-team-filter-btn{margin-left:auto;background:#147a42;color:#fff;font-weight:700}
+      .manage-teams-filter-btn{background:#3b5f47;color:#fff;font-weight:700}
+      .danger{background:#c63d1c;color:#fff}
+      .danger-outline{background:#fff3ed;color:#c63d1c;border:1px solid #f87171}
+
+      /* === Manage Teams modal === */
+      .manage-teams-card{width:min(640px,100%)}
+      .manage-teams-body{display:grid;gap:20px;margin:18px 0 0}
+      .manage-teams-group{}
+      .manage-teams-group-label{margin:0 0 10px;font-size:13px;font-weight:800;color:#17663d;text-transform:uppercase;letter-spacing:.6px}
+      .manage-teams-empty{margin:0;color:#758278;font-size:13px}
+      .manage-team-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid #d6dfd5;border-radius:10px;background:#fff;flex-wrap:wrap;margin-bottom:8px}
+      .manage-team-row--withdrawn{background:#f9f9f9;opacity:.85}
+      .manage-team-info{display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap}
+      .manage-team-badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.4px}
+      .manage-team-badge--active{background:#eaf4eb;color:#17663d}
+      .manage-team-badge--withdrawn{background:#fce8e8;color:#a72c11}
+      .manage-team-error{margin:4px 0 0;font-size:12px;color:#a72c11;font-weight:700;flex-basis:100%}
+      .manage-team-confirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1}
+      .manage-team-confirm-text{font-size:13px;color:#a72c11;font-weight:600;flex:1;min-width:180px}
+      .manage-team-confirm-actions{display:flex;gap:6px;flex-shrink:0}
+      .manage-team-confirm-actions button{min-height:36px;padding:6px 10px;font-size:12px}
       .top .identity-picker{justify-self:end}
       .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
       .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
@@ -116,6 +138,23 @@ export function Styles() {
       .availability-team{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}
       .availability-team--ready{background:#eaf4eb;color:#17663d}
       .availability-team--not-ready{background:#fff3ed;color:#8c351f}
+      .availability-date-details{margin-top:14px;padding:12px;border:1px solid #d6dfd5;border-radius:10px;background:#f8faf8;min-height:48px}
+      .availability-date-details-hint{margin:0;color:#8a9d8e;font-size:13px;font-style:italic}
+      .availability-date-details-heading{margin:0 0 12px;font-size:14px;font-weight:700;color:#284732}
+      .availability-date-details-content{}
+      .avail-detail-team{margin-bottom:14px}
+      .avail-detail-team:last-child{margin-bottom:0}
+      .avail-detail-team-name{font-size:13px;font-weight:700;color:#3a5242;margin-bottom:5px}
+      .avail-detail-players{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+      .avail-detail-player{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:7px;font-size:13px;background:#fff;border:1px solid #e2ebe2}
+      .avail-status-available{border-color:#b5d9bc;background:#eef8ef}
+      .avail-status-blocked{border-color:#f5c6bb;background:#fff5f2}
+      .avail-status-no-response{border-color:#e5e5e5;background:#fafafa}
+      .avail-player-name{font-weight:600;color:#2e4036}
+      .avail-player-status{font-size:12px;color:#5f7064}
+      .avail-status-available .avail-player-status{color:#17663d;font-weight:700}
+      .avail-status-blocked .avail-player-status{color:#8c351f;font-weight:700}
+      .avail-status-no-response .avail-player-status{color:#a0a0a0}
       .known-team{padding:12px;border:1px solid #cbdccd;border-radius:10px;background:#f1f7f1;color:#17663d;font-weight:800}
       .known-team small{display:block;margin-bottom:4px;color:#5f7064;font-size:11px;letter-spacing:.7px}
       .known-team-note{font-size:12px;color:#8a9d8e;margin-top:6px !important;font-weight:400}

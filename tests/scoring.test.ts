@@ -81,3 +81,70 @@ test('pending opponents exclude completed and scheduled matches but ignore cance
 
   assert.deepEqual(pendingOpponentsForTeam(matches, 'Group B', '10'), ['4', '6', '8', '13']);
 });
+
+test('voided/excluded matches do not affect standings', () => {
+  const matches: Match[] = [
+    {
+      id: '1',
+      matchup: 'Team #9 vs Team #11',
+      match_date: '2026-08-30',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'Completed',
+      result: '6-1, 6-4',
+      league_group: 'Group A',
+      excluded_from_standings: true,
+    },
+    {
+      id: '2',
+      matchup: 'Team #9 vs Team #12',
+      match_date: '2026-08-31',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'voided',
+      result: '6-1, 6-4',
+      league_group: 'Group A',
+    },
+  ];
+  const standings = computeStandings(matches, 'Group A');
+  const t9 = standings.find((r) => r.teamId === '9')!;
+  assert.equal(t9.matchesPlayed, 0);
+  assert.equal(t9.matchesWon, 0);
+  assert.equal(t9.totalPoints, 0);
+});
+
+test('withdrawal walkover override produces exactly 6-0, 6-0 for the opponent and preserves original', () => {
+  const matches: Match[] = [
+    {
+      id: '1',
+      matchup: 'Team #9 vs Team #11',
+      match_date: '2026-08-30',
+      match_time: '06:30:00',
+      court: 'WS',
+      status: 'Completed',
+      result: '7-6, 7-6', // Team 9 originally won closely
+      league_group: 'Group A',
+      standings_override: {
+        reason: 'team_withdrawal',
+        winnerTeamId: '11',
+        loserTeamId: '9',
+        score: {
+          set1: { teamA: 6, teamB: 0 },
+          set2: { teamA: 6, teamB: 0 },
+        },
+      },
+    },
+  ];
+
+  const standings = computeStandings(matches, 'Group A');
+
+  // Team 11 should have won 6-0, 6-0 via override
+  const t11 = standings.find((r) => r.teamId === '11')!;
+  assert.equal(t11.matchesPlayed, 1);
+  assert.equal(t11.matchesWon, 1);
+  assert.equal(t11.gamesWon, 12);
+  assert.equal(t11.gamesLost, 0);
+
+  // Original Match object should not be mutated
+  assert.equal(matches[0].result, '7-6, 7-6');
+});

@@ -59,8 +59,10 @@ export function MultiDateCalendar({
   };
 
   const handleDateClick = (date: Date) => {
-    const info = getDateInfo(date);
-    if (readOnly || isDateDisabled(info.state)) return;
+    if (!readOnly) {
+      const info = getDateInfo(date);
+      if (isDateDisabled(info.state)) return;
+    }
     onDateToggle(normalizeDate(date));
   };
 
@@ -238,8 +240,11 @@ function CalendarDay({
     <button
       type="button"
       className={`calendar-day state-${info.state} ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-      onClick={() => !disabled && onDateToggle(date)}
-      disabled={disabled}
+      onClick={() => {
+        if (!readOnly && disabled) return;
+        onDateToggle(date);
+      }}
+      disabled={!readOnly && disabled}
       title={title}
       aria-label={`${formatTitle(date)}, ${stateLabel}${reasonLabel ? `, ${reasonLabel}` : ''}`}
     >
