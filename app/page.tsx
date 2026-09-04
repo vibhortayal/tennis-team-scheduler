@@ -531,8 +531,9 @@ export default function Page() {
         .split(',')
         .concat(groups[scheduleGroup].find(([id]) => id === opponentId)?.[1].split(',') || [])
         .map((name) => name.trim());
-      const playersWithAvailability = participants.filter((player) => (slotMap.get(player) || []).length)
-        .length;
+      const playersWithAvailability = participants.filter(
+        (player) => (slotMap.get(player) || []).length
+      ).length;
       const missingPlayers = participants
         .map((player, index) => ({ player, name: participantNames[index] }))
         .filter(({ player }) => !(slotMap.get(player) || []).length)
@@ -564,7 +565,8 @@ export default function Page() {
         }).format(start);
         const hasExplicitBlock = participants.some((player) =>
           (slotMap.get(player) || []).some(
-            (slot) => (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
+            (slot) =>
+              (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
           )
         );
         if (hasExplicitBlock) {

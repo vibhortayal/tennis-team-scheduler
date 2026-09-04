@@ -1,12 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Group, Identity, teamDisplay, teamNames } from '../teams';
-import {
-  Match,
-  Suggestion,
-  dateText,
-  isBlockingStatus,
-  teamIds,
-} from '../lib/matches';
+import { Match, Suggestion, dateText, isBlockingStatus, teamIds } from '../lib/matches';
 import { AvailabilityManager, AvailabilitySlot, SlotSaveInput } from './AvailabilityManager';
 import { TeamContext } from './MatchCard';
 import {
@@ -111,11 +105,7 @@ export function SmartScheduling({
     const [start, end] = availabilityCheckSlot.split('-');
     const startsAt = new Date(`${availabilityCheckDate}T${start}:00`);
     const endsAt = new Date(`${availabilityCheckDate}T${end}:00`);
-    if (
-      Number.isNaN(startsAt.valueOf()) ||
-      Number.isNaN(endsAt.valueOf()) ||
-      endsAt <= startsAt
-    ) {
+    if (Number.isNaN(startsAt.valueOf()) || Number.isNaN(endsAt.valueOf()) || endsAt <= startsAt) {
       return null;
     }
     return { startsAt, endsAt };
@@ -154,20 +144,19 @@ export function SmartScheduling({
       const participants = [...yourPlayers, ...playerKeysForTeam(scheduleGroup, opponentId)];
       const participantSet = new Set(participants);
       const hasExplicitBlock = participants.some((playerId) =>
-        (availabilityByPlayer.get(playerId) || []).some(
-          (slot) => {
-            if ((slot.kind ?? 'available') !== 'blocked') return false;
-            if (normalizeDate(slot.startsAt) !== availabilityCheckDate) return false;
-            const blockedStart = new Date(slot.startsAt);
-            const blockedEnd = new Date(slot.endsAt);
-            return blockedStart < selectedSlotRange.endsAt && blockedEnd > selectedSlotRange.startsAt;
-          }
-        )
+        (availabilityByPlayer.get(playerId) || []).some((slot) => {
+          if ((slot.kind ?? 'available') !== 'blocked') return false;
+          if (normalizeDate(slot.startsAt) !== availabilityCheckDate) return false;
+          const blockedStart = new Date(slot.startsAt);
+          const blockedEnd = new Date(slot.endsAt);
+          return blockedStart < selectedSlotRange.endsAt && blockedEnd > selectedSlotRange.startsAt;
+        })
       );
       if (hasExplicitBlock) return false;
       const hasMatchOnDate = matches.some((match) => {
         if ((match.league_group || 'Group B') !== scheduleGroup) return false;
-        if (!isBlockingStatus(match.status) || match.match_date !== availabilityCheckDate) return false;
+        if (!isBlockingStatus(match.status) || match.match_date !== availabilityCheckDate)
+          return false;
         const ids = teamIds(match, scheduleGroup);
         const matchParticipants = ids.flatMap((teamId) => playerKeysForTeam(scheduleGroup, teamId));
         return matchParticipants.some((playerKey) => participantSet.has(playerKey));
@@ -391,7 +380,10 @@ export function SmartScheduling({
                       {availableTeamsForSlot.length > 0 && (
                         <div className="availability-team-list">
                           {availableTeamsForSlot.map((teamId) => (
-                            <span className="availability-team availability-team--ready" key={teamId}>
+                            <span
+                              className="availability-team availability-team--ready"
+                              key={teamId}
+                            >
                               {teamDisplay(scheduleGroup, teamId)}
                             </span>
                           ))}
