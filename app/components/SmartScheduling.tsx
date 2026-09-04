@@ -51,6 +51,8 @@ type SmartSchedulingProps = {
   availabilityOpponents: string[];
   onAvailabilityOpponentToggle: (value: string) => void;
   allAvailability: AvailabilitySlot[];
+  comparisonAvailabilitySlots: AvailabilitySlot[];
+  comparisonBlockingSlots: AvailabilitySlot[];
 };
 
 export function SmartScheduling({
@@ -86,6 +88,8 @@ export function SmartScheduling({
   availabilityOpponents,
   onAvailabilityOpponentToggle,
   allAvailability,
+  comparisonAvailabilitySlots,
+  comparisonBlockingSlots,
 }: SmartSchedulingProps) {
   const [schedulingTab, setSchedulingTab] = useState<'overview' | 'availability'>('overview');
   const [availabilityCheckDate, setAvailabilityCheckDate] = useState('');
@@ -306,8 +310,8 @@ export function SmartScheduling({
           </div>
 
           <AvailabilityManager
-            availabilitySlots={availabilitySlots}
-            blockingSlots={blockingSlots}
+            availabilitySlots={schedulingTab === 'overview' ? comparisonAvailabilitySlots : availabilitySlots}
+            blockingSlots={schedulingTab === 'overview' ? comparisonBlockingSlots : blockingSlots}
             teamMatches={teamMatches}
             participantStatusMap={participantStatusMap}
             readOnly={schedulingTab === 'overview'}
