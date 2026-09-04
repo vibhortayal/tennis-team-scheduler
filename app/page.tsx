@@ -156,47 +156,50 @@ export default function Page() {
     setAvailability(slots.filter((slot) => slot.playerId === playerKey));
   }, []);
 
-  const fetchAvailabilitySnapshot = useCallback(async (player: Identity) => {
-    if (player.viewing || !availabilityApi || !key) {
-      return [] as AvailabilitySlot[];
-    }
-    try {
-      const playerKeys = groups[player.group].flatMap(([teamId]) =>
-        playerKeysForTeam(player.group, teamId)
-      );
-      const rosterFilter = playerKeys
-        .map((playerKey) => `player_key.eq.${encodeURIComponent(playerKey)}`)
-        .join(',');
-      const response = await fetch(
-        `${availabilityApi}?or=(${rosterFilter})&select=*&order=starts_at.asc`,
-        { headers }
-      );
-      if (!response.ok) throw new Error('Could not load availability.');
-      const rows = (await response.json()) as Array<{
-        id: string;
-        player_key: string;
-        starts_at: string;
-        ends_at: string;
-        kind?: 'available' | 'blocked';
-        mode?: 'anytime' | 'time_windows' | 'all_day';
-        created_at?: string;
-        updated_at?: string;
-      }>;
-      const parsed = rows.map((row) => ({
-        id: row.id,
-        playerId: row.player_key,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-        kind: row.kind ?? 'available',
-        mode: row.mode ?? 'time_windows',
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
-      return parsed;
-    } catch {
-      return null;
-    }
-  }, []);
+  const fetchAvailabilitySnapshot = useCallback(
+    async (player: Identity) => {
+      if (player.viewing || !availabilityApi || !key) {
+        return [] as AvailabilitySlot[];
+      }
+      try {
+        const playerKeys = groups[player.group].flatMap(([teamId]) =>
+          playerKeysForTeam(player.group, teamId)
+        );
+        const rosterFilter = playerKeys
+          .map((playerKey) => `player_key.eq.${encodeURIComponent(playerKey)}`)
+          .join(',');
+        const response = await fetch(
+          `${availabilityApi}?or=(${rosterFilter})&select=*&order=starts_at.asc`,
+          { headers }
+        );
+        if (!response.ok) throw new Error('Could not load availability.');
+        const rows = (await response.json()) as Array<{
+          id: string;
+          player_key: string;
+          starts_at: string;
+          ends_at: string;
+          kind?: 'available' | 'blocked';
+          mode?: 'anytime' | 'time_windows' | 'all_day';
+          created_at?: string;
+          updated_at?: string;
+        }>;
+        const parsed = rows.map((row) => ({
+          id: row.id,
+          playerId: row.player_key,
+          startsAt: row.starts_at,
+          endsAt: row.ends_at,
+          kind: row.kind ?? 'available',
+          mode: row.mode ?? 'time_windows',
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }));
+        return parsed;
+      } catch {
+        return null;
+      }
+    },
+    [availabilityApi, key]
+  );
 
   const loadAvailability = useCallback(
     async (player: Identity) => {
@@ -218,7 +221,7 @@ export default function Page() {
         return null;
       }
     },
-    [applyAvailabilitySnapshot, fetchAvailabilitySnapshot]
+    [applyAvailabilitySnapshot, availabilityApi, fetchAvailabilitySnapshot, key]
   );
 
   useEffect(() => {
@@ -277,7 +280,13 @@ export default function Page() {
 
     const refreshAvailability = async () => {
       const parsed = await fetchAvailabilitySnapshot(identity);
-      if (!parsed || cancelled) {
+      if (!parsed) {
+        if (!cancelled) {
+          setAvailabilityError('Could not load your availability.');
+        }
+        return;
+      }
+      if (cancelled) {
         return;
       }
       applyAvailabilitySnapshot(identity, parsed);

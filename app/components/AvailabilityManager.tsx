@@ -320,13 +320,17 @@ function PickerSection({
   const inspectedDateDetails = useMemo(() => {
     if (!inspectedDate) return null;
     const slots = savedByDate.get(inspectedDate) || [];
+    const slotsByPlayer = new Map<string, AvailabilitySlot[]>();
+    slots.forEach((slot) => {
+      slotsByPlayer.set(slot.playerId, [...(slotsByPlayer.get(slot.playerId) || []), slot]);
+    });
     const status = {
       available: [] as Array<{ name: string; teamLabel: string }>,
       blocked: [] as Array<{ name: string; teamLabel: string }>,
       missing: [] as Array<{ name: string; teamLabel: string }>,
     };
     participants.forEach((participant) => {
-      const playerSlots = slots.filter((slot) => slot.playerId === participant.playerKey);
+      const playerSlots = slotsByPlayer.get(participant.playerKey) || [];
       const hasAvailable = playerSlots.some((slot) => (slot.kind ?? 'available') === 'available');
       const hasBlocked = playerSlots.some((slot) => (slot.kind ?? 'available') === 'blocked');
       if (hasAvailable) status.available.push(participant);
