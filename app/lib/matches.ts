@@ -22,9 +22,21 @@ export type Suggestion = {
   alternateCount?: number;
   missingPlayers?: string[];
   allPlayersReady?: boolean;
+  playersWithAvailability?: number;
+  totalPlayers?: number;
+  yourPreviousGame?: SuggestionMatchContext;
+  yourNextGame?: SuggestionMatchContext;
+  opponentPreviousGame?: SuggestionMatchContext;
+  opponentNextGame?: SuggestionMatchContext;
   yourGap: number;
   opponentGap: number;
   score: number;
+};
+
+export type SuggestionMatchContext = {
+  date: string;
+  time: string;
+  opponentId?: string;
 };
 
 export const blank = (g: Group): Draft => ({
