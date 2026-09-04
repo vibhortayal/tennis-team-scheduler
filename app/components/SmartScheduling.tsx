@@ -115,11 +115,18 @@ export function SmartScheduling({
       DEFAULT_MATCH_DURATION_MINUTES * 60_000
     );
   }, [selectedSlotRange]);
+  const availabilityByPlayer = useMemo(() => {
+    const map = new Map<string, AvailabilitySlot[]>();
+    allAvailability.forEach((slot) => {
+      map.set(slot.playerId, [...(map.get(slot.playerId) || []), slot]);
+    });
+    return map;
+  }, [allAvailability]);
   const availableTeamsForSlot = useMemo(() => {
     if (!selectedSlotRange || !slotHasMatchDuration || !suggestionTeam) return [];
     const canPlayWithinSlot = (participantKeys: string[]) => {
       const participantWindows = participantKeys.map((playerKey) => {
-        const slots = allAvailability.filter((slot) => slot.playerId === playerKey);
+        const slots = availabilityByPlayer.get(playerKey) || [];
         return effectiveWindowsForPlayer(slots);
       });
       const sharedWindows = intersectTimeWindows(participantWindows);
@@ -135,7 +142,7 @@ export function SmartScheduling({
       canPlayWithinSlot([...yourPlayers, ...playerKeysForTeam(scheduleGroup, opponentId)])
     );
   }, [
-    allAvailability,
+    availabilityByPlayer,
     pendingOpponentIds,
     scheduleGroup,
     selectedSlotRange,
