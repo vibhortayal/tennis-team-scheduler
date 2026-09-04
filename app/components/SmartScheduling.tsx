@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Group, Identity, teamDisplay, teamNames } from '../teams';
-import { Match, Suggestion, dateText } from '../lib/matches';
+import {
+  Match,
+  Suggestion,
+  dateText,
+  isBlockingStatus,
+  teamIds,
+} from '../lib/matches';
 import { AvailabilityManager, AvailabilitySlot, SlotSaveInput } from './AvailabilityManager';
 import { TeamContext } from './MatchCard';
 import {
@@ -10,7 +16,7 @@ import {
   intersectTimeWindows,
   playerKeysForTeam,
 } from '../lib/scheduling';
-import { getPlayableTimeWindows } from '../lib/availabilityHelpers';
+import { getPlayableTimeWindows, normalizeDate } from '../lib/availabilityHelpers';
 
 type SmartSchedulingProps = {
   identity: Identity;
@@ -90,6 +96,12 @@ export function SmartScheduling({
     .join('')
     .slice(0, 2)
     .toUpperCase();
+  const gameSummary = (match?: Suggestion['yourPreviousGame']) => {
+    if (!match) return 'None';
+    const time = match.time?.slice(0, 5) || '';
+    const opponent = match.opponentId ? ` vs Team #${match.opponentId}` : '';
+    return `${dateText(match.date)}${time ? ` (${time})` : ''}${opponent}`;
+  };
   const slotOptions = useMemo(
     () => (availabilityCheckDate ? getPlayableTimeWindows(availabilityCheckDate) : []),
     [availabilityCheckDate]
@@ -138,11 +150,35 @@ export function SmartScheduling({
       );
     };
     const yourPlayers = playerKeysForTeam(scheduleGroup, suggestionTeam);
-    return pendingOpponentIds.filter((opponentId) =>
-      canPlayWithinSlot([...yourPlayers, ...playerKeysForTeam(scheduleGroup, opponentId)])
-    );
+    return pendingOpponentIds.filter((opponentId) => {
+      const participants = [...yourPlayers, ...playerKeysForTeam(scheduleGroup, opponentId)];
+      const participantSet = new Set(participants);
+      const hasExplicitBlock = participants.some((playerId) =>
+        (availabilityByPlayer.get(playerId) || []).some(
+          (slot) => {
+            if ((slot.kind ?? 'available') !== 'blocked') return false;
+            if (normalizeDate(slot.startsAt) !== availabilityCheckDate) return false;
+            const blockedStart = new Date(slot.startsAt);
+            const blockedEnd = new Date(slot.endsAt);
+            return blockedStart < selectedSlotRange.endsAt && blockedEnd > selectedSlotRange.startsAt;
+          }
+        )
+      );
+      if (hasExplicitBlock) return false;
+      const hasMatchOnDate = matches.some((match) => {
+        if ((match.league_group || 'Group B') !== scheduleGroup) return false;
+        if (!isBlockingStatus(match.status) || match.match_date !== availabilityCheckDate) return false;
+        const ids = teamIds(match, scheduleGroup);
+        const matchParticipants = ids.flatMap((teamId) => playerKeysForTeam(scheduleGroup, teamId));
+        return matchParticipants.some((playerKey) => participantSet.has(playerKey));
+      });
+      if (hasMatchOnDate) return false;
+      return canPlayWithinSlot(participants);
+    });
   }, [
     availabilityByPlayer,
+    availabilityCheckDate,
+    matches,
     pendingOpponentIds,
     scheduleGroup,
     selectedSlotRange,
@@ -150,8 +186,11 @@ export function SmartScheduling({
     suggestionTeam,
   ]);
   const unavailableTeamsForSlot = useMemo(
-    () => pendingOpponentIds.filter((teamId) => !availableTeamsForSlot.includes(teamId)),
-    [availableTeamsForSlot, pendingOpponentIds]
+    () =>
+      !suggestionTeam
+        ? []
+        : pendingOpponentIds.filter((teamId) => !availableTeamsForSlot.includes(teamId)),
+    [availableTeamsForSlot, pendingOpponentIds, suggestionTeam]
   );
 
   return (
@@ -340,28 +379,37 @@ export function SmartScheduling({
               )}
               {availabilityCheckDate && availabilityCheckSlot && slotHasMatchDuration && (
                 <div className="availability-check-results" role="status">
-                  <p className="availability-check-note">
-                    {availableTeamsForSlot.length > 0
-                      ? `${availableTeamsForSlot.length} team${availableTeamsForSlot.length === 1 ? '' : 's'} available in this slot.`
-                      : 'No pending teams are fully available in this slot yet.'}
-                  </p>
-                  {availableTeamsForSlot.length > 0 && (
-                    <div className="availability-team-list">
-                      {availableTeamsForSlot.map((teamId) => (
-                        <span className="availability-team availability-team--ready" key={teamId}>
-                          {teamDisplay(scheduleGroup, teamId)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {unavailableTeamsForSlot.length > 0 && (
-                    <div className="availability-team-list">
-                      {unavailableTeamsForSlot.map((teamId) => (
-                        <span className="availability-team availability-team--not-ready" key={teamId}>
-                          {teamDisplay(scheduleGroup, teamId)}
-                        </span>
-                      ))}
-                    </div>
+                  {!suggestionTeam ? (
+                    <p className="availability-check-note">Select your player/team first.</p>
+                  ) : (
+                    <>
+                      <p className="availability-check-note">
+                        {availableTeamsForSlot.length > 0
+                          ? `${availableTeamsForSlot.length} team${availableTeamsForSlot.length === 1 ? '' : 's'} available in this slot.`
+                          : 'No pending teams are fully available in this slot yet.'}
+                      </p>
+                      {availableTeamsForSlot.length > 0 && (
+                        <div className="availability-team-list">
+                          {availableTeamsForSlot.map((teamId) => (
+                            <span className="availability-team availability-team--ready" key={teamId}>
+                              {teamDisplay(scheduleGroup, teamId)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {unavailableTeamsForSlot.length > 0 && (
+                        <div className="availability-team-list">
+                          {unavailableTeamsForSlot.map((teamId) => (
+                            <span
+                              className="availability-team availability-team--not-ready"
+                              key={teamId}
+                            >
+                              {teamDisplay(scheduleGroup, teamId)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -468,6 +516,19 @@ export function SmartScheduling({
                       {suggestion.opponentGap === 99
                         ? 'No nearby match'
                         : `${suggestion.opponentGap} days`}
+                    </p>
+                    <p className="availability-check-note">
+                      Availability updated by {suggestion.playersWithAvailability ?? 0}/
+                      {suggestion.totalPlayers ?? 4} players.
+                    </p>
+                    <p className="gap-text">
+                      Your previous game: {gameSummary(suggestion.yourPreviousGame)}
+                      <br />
+                      Your next game: {gameSummary(suggestion.yourNextGame)}
+                      <br />
+                      Opponent previous game: {gameSummary(suggestion.opponentPreviousGame)}
+                      <br />
+                      Opponent next game: {gameSummary(suggestion.opponentNextGame)}
                     </p>
 
                     {suggestion.alternateCount ? (

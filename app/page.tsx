@@ -464,6 +464,24 @@ export default function Page() {
     setNote('');
   };
 
+  const buildSuggestionMatchContext = (teamHistory: Match[], teamId: string, date: string) => {
+    const previous = teamHistory
+      .filter((match) => match.match_date < date)
+      .sort((a, b) => b.match_date.localeCompare(a.match_date))[0];
+    const next = teamHistory
+      .filter((match) => match.match_date > date)
+      .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
+    const toContext = (match?: Match) => {
+      if (!match) return undefined;
+      return {
+        date: match.match_date,
+        time: match.match_time,
+        opponentId: teamIds(match, scheduleGroup).find((id) => id !== teamId),
+      };
+    };
+    return { previous: toContext(previous), next: toContext(next) };
+  };
+
   const findSuggestions = () => {
     if (identity.viewing || !suggestionTeam) {
       setSuggestionNote('Select who you are from the top-right menu first.');
@@ -513,6 +531,8 @@ export default function Page() {
         .split(',')
         .concat(groups[scheduleGroup].find(([id]) => id === opponentId)?.[1].split(',') || [])
         .map((name) => name.trim());
+      const playersWithAvailability = participants.filter((player) => (slotMap.get(player) || []).length)
+        .length;
       const missingPlayers = participants
         .map((player, index) => ({ player, name: participantNames[index] }))
         .filter(({ player }) => !(slotMap.get(player) || []).length)
@@ -542,6 +562,20 @@ export default function Page() {
           month: '2-digit',
           day: '2-digit',
         }).format(start);
+        const hasExplicitBlock = participants.some((player) =>
+          (slotMap.get(player) || []).some(
+            (slot) => (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
+          )
+        );
+        if (hasExplicitBlock) {
+          return;
+        }
+        const hasMatchOnDate =
+          yourMatches.some((match) => match.match_date === date) ||
+          opponentMatches.some((match) => match.match_date === date);
+        if (hasMatchOnDate) {
+          return;
+        }
 
         const hasScheduledConflict = [...yourMatches, ...opponentMatches].some((match) => {
           if (match.match_date !== date || match.status.toLowerCase() !== 'scheduled') return false;
@@ -559,6 +593,8 @@ export default function Page() {
 
         const yourGap = restGapAroundDate(yourMatches, date);
         const opponentGap = restGapAroundDate(opponentMatches, date);
+        const yourContexts = buildSuggestionMatchContext(yourMatches, suggestionTeam, date);
+        const opponentContexts = buildSuggestionMatchContext(opponentMatches, opponentId, date);
 
         if (yourGap < yourGapDays || opponentGap < opponentGapDays) {
           return;
@@ -572,6 +608,12 @@ export default function Page() {
           alternateCount: Math.max(0, starts.length - 1),
           missingPlayers,
           allPlayersReady: missingPlayers.length === 0,
+          playersWithAvailability,
+          totalPlayers: participants.length,
+          yourPreviousGame: yourContexts.previous,
+          yourNextGame: yourContexts.next,
+          opponentPreviousGame: opponentContexts.previous,
+          opponentNextGame: opponentContexts.next,
           yourGap,
           opponentGap,
           score: yourGap + opponentGap,
