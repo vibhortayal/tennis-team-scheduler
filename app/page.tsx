@@ -67,8 +67,8 @@ export default function Page() {
   const [pendingIdentityValue, setPendingIdentityValue] = useState('');
   const [note, setNote] = useState('');
   const [suggestionTeam, setSuggestionTeam] = useState('');
-  const [yourGapDays, setYourGapDays] = useState(3);
-  const [opponentGapDays, setOpponentGapDays] = useState(3);
+  const [yourGapDays, setYourGapDays] = useState(1);
+  const [opponentGapDays, setOpponentGapDays] = useState(1);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionNote, setSuggestionNote] = useState('');
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
