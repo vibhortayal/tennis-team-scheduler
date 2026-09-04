@@ -9,6 +9,9 @@ export const api = process.env.NEXT_PUBLIC_SUPABASE_URL
 export const availabilityApi = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/player_availability`
   : '';
+export const teamsApi = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dashboard_teams`
+  : '';
 
 export const supabaseKey = key;
 

@@ -19,7 +19,10 @@ export function Styles() {
       .next-matches{display:block}
       .wide-hero{width:100%}
       .wide-hero .eyebrow{margin-bottom:12px}
-      .top .group-schedule{display:block;margin:0;justify-self:center}
+      .header-actions{display:flex;align-items:center;gap:8px;justify-self:center}
+      .top .group-schedule{display:block;margin:0}
+      .add-team-btn{background:#17663d;color:#fff;display:inline-flex;align-items:center;gap:4px}
+      .add-team-filter-btn{margin-left:auto;background:#147a42;color:#fff;font-weight:700}
       .top .identity-picker{justify-self:end}
       .eyebrow{color:#147a42;font-size:12px;font-weight:800;letter-spacing:1px}
       .badge{background:#147a42;color:#fff;height:max-content;border-radius:999px;padding:10px;font-weight:800}
@@ -56,6 +59,11 @@ export function Styles() {
       .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
       .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
       .field-label{font-size:13px;font-weight:bold;color:#15231a}
+      .form-error-banner{padding:10px 14px;background:#fef2f2;border:1px solid #f87171;border-radius:8px;color:#b91c1c;font-size:13px;font-weight:600;margin-bottom:14px}
+      .add-team-success{display:grid;gap:14px;padding:8px 0}
+      .add-team-success-badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#147a42;color:#fff;font-size:11px;font-weight:800;letter-spacing:.5px;width:fit-content}
+      .add-team-summary-card{padding:14px;background:#f8fbf7;border:1px solid #d6dfd5;border-radius:10px}
+      .add-team-group-tag{margin:8px 0 0;font-size:13px;color:#47614d}
       .wide{grid-column:1/-1}
       .actions{margin-top:20px;display:flex;justify-content:flex-end;gap:8px}
       .secondary{background:#eaf4eb;color:#17663d}

@@ -1,14 +1,17 @@
 import { Identity, allPlayers, identityValue, viewingIdentity } from '../teams';
 
-const sortedPlayers = [...allPlayers].sort((a, b) => a.name.localeCompare(b.name));
-
 export function PlayerPicker({
   identity,
   onChange,
+  players,
 }: {
   identity: Identity;
   onChange: (next: Identity) => void;
+  players?: Identity[];
 }) {
+  const playerList = players || allPlayers;
+  const sortedPlayers = [...playerList].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <label className="identity-picker">
       <span className="identity-picker-label">Logged in as</span>
@@ -22,7 +25,7 @@ export function PlayerPicker({
             onChange(viewingIdentity);
             return;
           }
-          const selected = allPlayers.find((player) => identityValue(player) === value);
+          const selected = playerList.find((player) => identityValue(player) === value);
           if (selected) onChange(selected);
         }}
       >

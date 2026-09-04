@@ -1,4 +1,4 @@
-import { Group, Identity, groups, teamDisplay } from '../teams';
+import { Group, Identity, Team, groups, teamDisplay } from '../teams';
 import { Match, dateText, canUpdateMatch, currentDateInFremont, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
 
@@ -11,10 +11,13 @@ type DashboardProps = {
   filter: string;
   team: string;
   identity: Identity;
+  roster?: readonly Team[];
+  rosters?: Record<Group, readonly Team[]>;
   onGroupChange: (group: Group) => void;
   onFilterChange: (filter: string) => void;
   onTeamChange: (team: string) => void;
   onEdit: (match: Match) => void;
+  onAddTeam?: () => void;
 };
 
 export function Dashboard({
@@ -26,12 +29,16 @@ export function Dashboard({
   filter,
   team,
   identity,
+  roster,
+  rosters,
   onGroupChange,
   onFilterChange,
   onTeamChange,
   onEdit,
+  onAddTeam,
 }: DashboardProps) {
-  const roster = groups[group];
+  const currentRoster = roster || groups[group];
+  const currentRosters = rosters || groups;
   const filteredUpcoming = upcoming.filter(
     (match) =>
       (filter === 'All' || match.status === filter) &&
@@ -91,7 +98,7 @@ export function Dashboard({
             onClick={() => onGroupChange(nextGroup)}
             key={nextGroup}
           >
-            {nextGroup} · {groups[nextGroup].length} teams
+            {nextGroup} · {currentRosters[nextGroup].length} teams
           </button>
         ))}
       </div>
@@ -110,12 +117,23 @@ export function Dashboard({
         <select value={team} onChange={(event) => onTeamChange(event.target.value)}>
           <option value="">All {group} teams</option>
 
-          {roster.map(([id]) => (
+          {currentRoster.map(([id]) => (
             <option value={id} key={id}>
               {teamDisplay(group, id)}
             </option>
           ))}
         </select>
+
+        {onAddTeam && (
+          <button
+            type="button"
+            className="add-team-filter-btn"
+            onClick={onAddTeam}
+            title="Add a new team to the league"
+          >
+            + Add Team
+          </button>
+        )}
       </div>
 
       {overdue.length > 0 && (

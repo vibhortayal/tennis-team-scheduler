@@ -4,11 +4,16 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Group,
   Identity,
+  Team,
   groups,
   IDENTITY_KEY,
   allPlayers,
   viewingIdentity,
   identityValue,
+  TeamRecord,
+  initialStaticTeams,
+  updateTeamRegistry,
+  getActivePlayers,
 } from './teams';
 import {
   Match,
@@ -25,7 +30,7 @@ import {
   pendingOpponentsForTeam,
   restGapAroundDate,
 } from './lib/matches';
-import { api, availabilityApi, supabaseKey as key, headers } from './lib/supabase';
+import { api, availabilityApi, teamsApi, supabaseKey as key, headers } from './lib/supabase';
 import {
   AvailabilitySlot,
   DEFAULT_MATCH_DURATION_MINUTES,
@@ -47,6 +52,8 @@ import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
 import { DateParticipantStatus } from './components/MultiDateCalendar';
+import { AddTeamModal } from './components/AddTeamModal';
+import { getActiveRoster, NewTeamInput, validateNewTeam } from './lib/teamValidation';
 
 type View = 'dashboard' | 'scheduling' | 'standings';
 
@@ -56,6 +63,8 @@ export default function Page() {
   const [scheduleGroup, setScheduleGroup] = useState<Group>('Group A');
   const [standingsGroup, setStandingsGroup] = useState<Group>('Group A');
   const [matches, setMatches] = useState<Match[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamRecord[]>([...initialStaticTeams]);
+  const [addTeamOpen, setAddTeamOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
   const [first, setFirst] = useState('');
@@ -79,8 +88,19 @@ export default function Page() {
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
 
-  const roster = groups[group];
-  const scheduleRoster = groups[scheduleGroup];
+  const activeRosterA = useMemo(() => getActiveRoster(allTeams, 'Group A'), [allTeams]);
+  const activeRosterB = useMemo(() => getActiveRoster(allTeams, 'Group B'), [allTeams]);
+  const activeRosters: Record<Group, readonly Team[]> = useMemo(
+    () => ({
+      'Group A': activeRosterA,
+      'Group B': activeRosterB,
+    }),
+    [activeRosterA, activeRosterB]
+  );
+  const activePlayers = useMemo(() => getActivePlayers(allTeams), [allTeams]);
+
+  const roster = activeRosters[group] || groups[group];
+  const scheduleRoster = activeRosters[scheduleGroup] || groups[scheduleGroup];
   const partnerName =
     scheduleRoster
       .find(([id]) => id === suggestionTeam)?.[1]
@@ -121,9 +141,135 @@ export default function Page() {
     }
   };
 
+  const loadTeams = useCallback(async () => {
+    if (!teamsApi || !key) {
+      updateTeamRegistry(initialStaticTeams);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${teamsApi}?select=*&order=created_at.asc`, { headers });
+      if (!response.ok) {
+        updateTeamRegistry(initialStaticTeams);
+        return;
+      }
+      const rows = (await response.json()) as Array<{
+        id: string;
+        team_number: string;
+        player1_name: string;
+        player2_name: string;
+        player_names: string;
+        league_group: Group;
+        status: 'active' | 'withdrawn';
+        created_at?: string;
+      }>;
+      if (Array.isArray(rows) && rows.length > 0) {
+        const parsed: TeamRecord[] = rows.map((r) => ({
+          id: r.id,
+          teamId: r.team_number,
+          player1: r.player1_name,
+          player2: r.player2_name,
+          playerNames: r.player_names,
+          group: r.league_group,
+          status: r.status,
+          createdAt: r.created_at,
+        }));
+        // Merge with static defaults if any are missing
+        const teamIdSet = new Set(parsed.map((t) => t.teamId));
+        const combined = [...parsed];
+        for (const st of initialStaticTeams) {
+          if (!teamIdSet.has(st.teamId)) {
+            combined.push(st);
+          }
+        }
+        setAllTeams(combined);
+        updateTeamRegistry(combined);
+      } else {
+        setAllTeams([...initialStaticTeams]);
+        updateTeamRegistry(initialStaticTeams);
+      }
+    } catch {
+      updateTeamRegistry(initialStaticTeams);
+    }
+  }, []);
+
+  const saveNewTeam = async (input: NewTeamInput): Promise<{ ok: boolean; error?: string }> => {
+    const validation = validateNewTeam(input, allTeams);
+    if (validation.ok === false) {
+      return { ok: false, error: validation.error };
+    }
+
+    const { teamNumber, player1, player2, playerNames, group: teamGroup, status } = validation.data;
+
+    let createdRecord: TeamRecord = {
+      teamId: teamNumber,
+      player1,
+      player2,
+      playerNames,
+      group: teamGroup,
+      status,
+    };
+
+    if (teamsApi && key) {
+      try {
+        const response = await fetch(teamsApi, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            team_number: teamNumber,
+            player1_name: player1,
+            player2_name: player2,
+            player_names: playerNames,
+            league_group: teamGroup,
+            status,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let msg = `Could not save team to Supabase: ${errText || response.statusText}`;
+          if (errText.includes('dashboard_teams') && errText.includes('does not exist')) {
+            msg =
+              'Could not save team because the Supabase dashboard_teams migration (005) has not been applied yet.';
+          }
+          return { ok: false, error: msg };
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data) && data[0]) {
+          createdRecord = {
+            id: data[0].id,
+            teamId: data[0].team_number,
+            player1: data[0].player1_name,
+            player2: data[0].player2_name,
+            playerNames: data[0].player_names,
+            group: data[0].league_group,
+            status: data[0].status,
+            createdAt: data[0].created_at,
+          };
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          error: `Persistence error: ${err instanceof Error ? err.message : 'Network error.'}`,
+        };
+      }
+    }
+
+    setAllTeams((prev) => {
+      const updated = [...prev, createdRecord];
+      updateTeamRegistry(updated);
+      return updated;
+    });
+
+    setNote(`Team #${teamNumber} (${playerNames}) added successfully to ${teamGroup}.`);
+    return { ok: true };
+  };
+
   useEffect(() => {
     load();
-  }, []);
+    loadTeams();
+  }, [loadTeams]);
 
   const loadAvailability = useCallback(async (player: Identity) => {
     if (player.viewing || !availabilityApi || !key) {
@@ -298,11 +444,14 @@ export default function Page() {
     setTeam('');
 
     if (!open) {
-      setFirst(groups[group][0][0]);
-      setSecond(groups[group][1][0]);
+      const gRoster = activeRosters[group];
+      if (gRoster && gRoster.length >= 2) {
+        setFirst(gRoster[0][0]);
+        setSecond(gRoster[1][0]);
+      }
       setDraft(blank(group));
     }
-  }, [group, open]);
+  }, [group, open, activeRosters]);
 
   const scoped = useMemo(
     () =>
@@ -310,19 +459,25 @@ export default function Page() {
         (match) =>
           (match.league_group || 'Group B') === group &&
           (filter === 'All' || match.status === filter) &&
-          (!team || teamIds(match, group).includes(team))
+          (!team || teamIds(match, group, roster).includes(team))
       ),
-    [matches, group, filter, team]
+    [matches, group, filter, team, roster]
   );
 
-  const standingsA = useMemo(() => computeStandings(matches, 'Group A'), [matches]);
-  const standingsB = useMemo(() => computeStandings(matches, 'Group B'), [matches]);
+  const standingsA = useMemo(
+    () => computeStandings(matches, 'Group A', activeRosterA),
+    [matches, activeRosterA]
+  );
+  const standingsB = useMemo(
+    () => computeStandings(matches, 'Group B', activeRosterB),
+    [matches, activeRosterB]
+  );
   const pendingOpponentIds = useMemo(
-    () => pendingOpponentsForTeam(matches, scheduleGroup, suggestionTeam),
-    [matches, scheduleGroup, suggestionTeam]
+    () => pendingOpponentsForTeam(matches, scheduleGroup, suggestionTeam, scheduleRoster),
+    [matches, scheduleGroup, suggestionTeam, scheduleRoster]
   );
   const opponentMissingNames = pendingOpponentIds.flatMap((opponentId) => {
-    const team = groups[scheduleGroup].find(([id]) => id === opponentId);
+    const team = scheduleRoster.find(([id]) => id === opponentId);
     if (!team) return [];
     return team[1]
       .split(',')
@@ -337,7 +492,7 @@ export default function Page() {
   const participantStatusMap = (() => {
     const participantTeams = [suggestionTeam, ...availabilityOpponents].filter(Boolean);
     const participants = participantTeams.flatMap((teamId) => {
-      const team = groups[scheduleGroup].find(([id]) => id === teamId);
+      const team = scheduleRoster.find(([id]) => id === teamId);
       return team
         ? team[1].split(',').map((name) => ({
             key: `${scheduleGroup}:${teamId}:${name.trim()}`,
@@ -416,16 +571,16 @@ export default function Page() {
 
     if (match) {
       const matchGroup = (match.league_group || 'Group B') as Group;
-      const matchRoster = groups[matchGroup];
+      const matchRoster = activeRosters[matchGroup] || groups[matchGroup];
       const ids = teamIds(match, matchGroup);
 
       setDraft({ ...match, league_group: matchGroup });
-      setFirst(ids[0] || matchRoster[0][0]);
-      setSecond(ids[1] || matchRoster[1][0]);
+      setFirst(ids[0] || matchRoster[0]?.[0] || '');
+      setSecond(ids[1] || matchRoster[1]?.[0] || '');
     } else {
       setDraft(blank(group));
-      setFirst(identity.teamId || roster[0][0]);
-      setSecond(roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0][0]);
+      setFirst(identity.teamId || roster[0]?.[0] || '');
+      setSecond(roster.find(([id]) => id !== identity.teamId)?.[0] || roster[0]?.[0] || '');
     }
 
     setOpen(true);
@@ -455,9 +610,8 @@ export default function Page() {
     setEditing(null);
     setFirst(selected.teamId);
 
-    setSecond(
-      groups[selected.group].find(([id]) => id !== selected.teamId)?.[0] || selected.teamId
-    );
+    const groupRoster = activeRosters[selected.group] || groups[selected.group];
+    setSecond(groupRoster.find(([id]) => id !== selected.teamId)?.[0] || selected.teamId);
 
     setDraft(blank(selected.group));
     setOpen(true);
@@ -503,12 +657,12 @@ export default function Page() {
       slotMap.set(slot.playerId, [...(slotMap.get(slot.playerId) || []), slot])
     );
 
-    const possibleOpponents = scheduleRoster
-      .map(([id]) => id)
+    const possibleOpponents: string[] = scheduleRoster
+      .map((t) => t[0])
       .filter((id) => id !== suggestionTeam)
       .filter((opponentId) => !existingFixture(matches, scheduleGroup, suggestionTeam, opponentId));
-    const teamMatches = new Map(
-      scheduleRoster.map(([id]) => [id, matchesForTeam(matches, scheduleGroup, id)])
+    const teamMatches = new Map<string, Match[]>(
+      scheduleRoster.map((t) => [t[0], matchesForTeam(matches, scheduleGroup, t[0])])
     );
     const yourMatches = teamMatches.get(suggestionTeam) || [];
 
@@ -526,10 +680,10 @@ export default function Page() {
           .filter((player) => (slotMap.get(player) || []).length > 0)
           .map((player) => effectiveWindowsForPlayer(slotMap.get(player) || []))
       );
-      const participantNames = groups[scheduleGroup]
+      const participantNames = scheduleRoster
         .find(([id]) => id === suggestionTeam)?.[1]
         .split(',')
-        .concat(groups[scheduleGroup].find(([id]) => id === opponentId)?.[1].split(',') || [])
+        .concat(scheduleRoster.find(([id]) => id === opponentId)?.[1].split(',') || [])
         .map((name) => name.trim());
       const playersWithAvailability = participants.filter(
         (player) => (slotMap.get(player) || []).length
@@ -767,11 +921,16 @@ export default function Page() {
           <b>🎾 Innovation Tennis Open</b>
         </div>
 
-        <button className="group-schedule" onClick={startScheduling}>
-          Schedule match
-        </button>
+        <div className="header-actions">
+          <button className="group-schedule" onClick={startScheduling}>
+            Schedule match
+          </button>
+          <button type="button" className="add-team-btn" onClick={() => setAddTeamOpen(true)}>
+            + Add Team
+          </button>
+        </div>
 
-        <PlayerPicker identity={identity} onChange={chooseIdentity} />
+        <PlayerPicker identity={identity} onChange={chooseIdentity} players={activePlayers} />
       </header>
 
       <div className="tabs">
@@ -809,10 +968,13 @@ export default function Page() {
           filter={filter}
           team={team}
           identity={identity}
+          roster={roster}
+          rosters={activeRosters}
           onGroupChange={setGroup}
           onFilterChange={setFilter}
           onTeamChange={setTeam}
           onEdit={begin}
+          onAddTeam={() => setAddTeamOpen(true)}
         />
       ) : view === 'standings' ? (
         <StandingsView
@@ -890,6 +1052,14 @@ export default function Page() {
           onSubmit={save}
         />
       )}
+
+      <AddTeamModal
+        isOpen={addTeamOpen}
+        defaultGroup={group}
+        existingTeams={allTeams}
+        onClose={() => setAddTeamOpen(false)}
+        onSave={saveNewTeam}
+      />
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import { Group, groups, Identity } from '../teams';
+import { Group, groups, Identity, Team, allKnownTeams } from '../teams';
 
 export type Match = {
   id: string;
@@ -107,10 +107,12 @@ export const matchIncludesTeam = (matchup: string, teamId: string) => {
   return false;
 };
 
-export const teamIds = (m: Match, g: Group) =>
-  Array.from(m.matchup.matchAll(/Team #(\d+)/g), (match) => match[1]).filter((id) =>
-    groups[g].some(([teamId]) => teamId === id)
+export const teamIds = (m: Match, g: Group, roster?: readonly Team[]) => {
+  const currentRoster = roster || groups[g];
+  return Array.from(m.matchup.matchAll(/Team #(\d+)/g), (match) => match[1]).filter(
+    (id) => currentRoster.some(([teamId]) => teamId === id) || allKnownTeams.has(id)
   );
+};
 
 export const canUpdateMatch = (match: Match, identity: Identity) => {
   const matchGroup = (match.league_group || 'Group B') as Group;
@@ -149,8 +151,14 @@ export const matchesForTeam = (allMatches: Match[], group: Group, teamId: string
       matchIncludesTeam(match.matchup, teamId)
   );
 
-export const pendingOpponentsForTeam = (allMatches: Match[], group: Group, teamId: string) => {
-  const opponents = groups[group]
+export const pendingOpponentsForTeam = (
+  allMatches: Match[],
+  group: Group,
+  teamId: string,
+  roster?: readonly Team[]
+) => {
+  const currentRoster = roster || groups[group];
+  const opponents = currentRoster
     .map(([opponentId]) => opponentId)
     .filter((opponentId) => opponentId !== teamId);
 

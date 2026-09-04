@@ -3,7 +3,7 @@
  * All standings computation lives here so it can be tested in isolation.
  */
 
-import { Group, groups } from '../teams';
+import { Group, groups, Team } from '../teams';
 import { Match, teamIds, matchIncludesTeam } from './matches';
 
 // ---------------------------------------------------------------------------
@@ -188,11 +188,6 @@ export type TeamStandingRow = {
   groupRank: number;
 };
 
-const TOTAL_MATCHES: Record<Group, number> = {
-  'Group A': 5,
-  'Group B': 6,
-};
-
 /**
  * Determine match winner from a structured result string.
  * Returns 'a' | 'b' | null.
@@ -233,9 +228,13 @@ function gamesForTeam(result: string, isTeamA: boolean): { won: number; lost: nu
   return { won, lost };
 }
 
-export function computeStandings(allMatches: Match[], group: Group): TeamStandingRow[] {
-  const roster = groups[group];
-  const total = TOTAL_MATCHES[group];
+export function computeStandings(
+  allMatches: Match[],
+  group: Group,
+  customRoster?: readonly Team[]
+): TeamStandingRow[] {
+  const roster = customRoster || groups[group];
+  const total = Math.max(0, roster.length - 1);
 
   // Only completed matches with parseable results
   const completedMatches = allMatches.filter(
