@@ -198,25 +198,28 @@ export default function Page() {
     }
   }, []);
 
-  const loadAvailability = useCallback(async (player: Identity) => {
-    if (player.viewing || !availabilityApi || !key) {
-      setAvailability([]);
-      setAllAvailability([]);
-      return [] as AvailabilitySlot[];
-    }
-    try {
-      const parsed = await fetchAvailabilitySnapshot(player);
-      if (!parsed) {
-        throw new Error('Could not load availability.');
+  const loadAvailability = useCallback(
+    async (player: Identity) => {
+      if (player.viewing || !availabilityApi || !key) {
+        setAvailability([]);
+        setAllAvailability([]);
+        return [] as AvailabilitySlot[];
       }
-      applyAvailabilitySnapshot(player, parsed);
-      setAvailabilityError('');
-      return parsed;
-    } catch {
-      setAvailabilityError('Could not load your availability.');
-      return null;
-    }
-  }, [applyAvailabilitySnapshot, fetchAvailabilitySnapshot]);
+      try {
+        const parsed = await fetchAvailabilitySnapshot(player);
+        if (!parsed) {
+          throw new Error('Could not load availability.');
+        }
+        applyAvailabilitySnapshot(player, parsed);
+        setAvailabilityError('');
+        return parsed;
+      } catch {
+        setAvailabilityError('Could not load your availability.');
+        return null;
+      }
+    },
+    [applyAvailabilitySnapshot, fetchAvailabilitySnapshot]
+  );
 
   useEffect(() => {
     try {
@@ -614,8 +617,9 @@ export default function Page() {
         .split(',')
         .concat(groups[scheduleGroup].find(([id]) => id === opponentId)?.[1].split(',') || [])
         .map((name) => name.trim());
-      const playersWithAvailability = participants.filter((player) => (slotMap.get(player) || []).length)
-        .length;
+      const playersWithAvailability = participants.filter(
+        (player) => (slotMap.get(player) || []).length
+      ).length;
       const missingPlayers = participants
         .map((player, index) => ({ player, name: participantNames[index] }))
         .filter(({ player }) => !(slotMap.get(player) || []).length)
@@ -647,7 +651,8 @@ export default function Page() {
         }).format(start);
         const hasExplicitBlock = participants.some((player) =>
           (slotMap.get(player) || []).some(
-            (slot) => (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
+            (slot) =>
+              (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
           )
         );
         if (hasExplicitBlock) {
@@ -936,6 +941,7 @@ export default function Page() {
           opponentMissingNames={opponentMissingNames}
           availabilityOpponents={availabilityOpponents}
           allAvailability={allAvailability}
+          comparisonParticipantKeys={Array.from(comparedParticipantKeys)}
           comparisonAvailabilitySlots={comparisonAvailabilitySlots}
           comparisonBlockingSlots={comparisonBlockingSlots}
           onAvailabilityOpponentToggle={(opponentId) =>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AvailabilitySlot, SlotKind, SlotMode } from '../lib/scheduling';
 import { Match } from '../lib/matches';
+import { Group, teamDisplay } from '../teams';
 import {
   buildAvailabilityMap,
   buildBlockingMap,
@@ -35,6 +36,7 @@ type AvailabilityManagerProps = {
   blockingSlots: AvailabilitySlot[];
   teamMatches: Match[];
   participantStatusMap: Map<DateString, DateParticipantStatus>;
+  participantKeys?: string[];
   readOnly?: boolean;
   deadline: string;
   saving: boolean;
@@ -51,6 +53,7 @@ export function AvailabilityManager({
   blockingSlots,
   teamMatches,
   participantStatusMap,
+  participantKeys = [],
   readOnly = false,
   deadline,
   saving,
@@ -132,6 +135,7 @@ export function AvailabilityManager({
           blockingMap={blockingMap}
           matchDates={matchDates}
           participantStatusMap={participantStatusMap}
+          participantKeys={participantKeys}
           readOnly={readOnly}
           minDate={minDate}
           maxDate={maxDate}
@@ -167,6 +171,7 @@ function PickerSection({
   blockingMap,
   matchDates,
   participantStatusMap,
+  participantKeys,
   readOnly,
   minDate,
   maxDate,
@@ -180,6 +185,7 @@ function PickerSection({
   blockingMap: Map<DateString, DayBlock>;
   matchDates: DateString[];
   participantStatusMap: Map<DateString, DateParticipantStatus>;
+  participantKeys: string[];
   readOnly: boolean;
   minDate: Date;
   maxDate: Date;
@@ -190,6 +196,7 @@ function PickerSection({
   const [pendingDates, setPendingDates] = useState<DateString[]>([]);
   const [configs, setConfigs] = useState<Record<DateString, PendingConfig>>({});
   const [localError, setLocalError] = useState('');
+  const [inspectedDate, setInspectedDate] = useState<DateString | null>(null);
 
   const defaultMode = pickerType === 'availability' ? 'anytime' : 'all_day';
   const modeOptions =
@@ -297,6 +304,36 @@ function PickerSection({
     });
     return map;
   }, [savedSlots]);
+  const participants = useMemo(
+    () =>
+      participantKeys.map((playerKey) => {
+        const [group, teamId, name] = playerKey.split(':');
+        return {
+          playerKey,
+          name: name ?? playerKey,
+          teamLabel: group && teamId ? teamDisplay(group as Group, teamId) : 'Unknown team',
+        };
+      }),
+    [participantKeys]
+  );
+  const inspectedDateDetails = useMemo(() => {
+    if (!inspectedDate) return null;
+    const slots = savedByDate.get(inspectedDate) || [];
+    const status = {
+      available: [] as Array<{ name: string; teamLabel: string }>,
+      blocked: [] as Array<{ name: string; teamLabel: string }>,
+      missing: [] as Array<{ name: string; teamLabel: string }>,
+    };
+    participants.forEach((participant) => {
+      const playerSlots = slots.filter((slot) => slot.playerId === participant.playerKey);
+      const hasAvailable = playerSlots.some((slot) => (slot.kind ?? 'available') === 'available');
+      const hasBlocked = playerSlots.some((slot) => (slot.kind ?? 'available') === 'blocked');
+      if (hasAvailable) status.available.push(participant);
+      if (hasBlocked) status.blocked.push(participant);
+      if (!hasAvailable && !hasBlocked) status.missing.push(participant);
+    });
+    return status;
+  }, [inspectedDate, participants, savedByDate]);
 
   const chipEntries: SelectedDayChipEntry[] = Array.from(savedByDate.entries()).map(
     ([date, slots]) => {
@@ -343,6 +380,7 @@ function PickerSection({
         blockingMap={blockingMap}
         matchDates={matchDates}
         participantStatusMap={participantStatusMap}
+        onDateInspect={readOnly ? setInspectedDate : undefined}
         readOnly={readOnly}
         pickerType={pickerType}
         minDate={minDate}
@@ -405,6 +443,68 @@ function PickerSection({
             </p>
           )}
         </>
+      )}
+      {readOnly && inspectedDate && inspectedDateDetails && (
+        <div className="modal" onClick={() => setInspectedDate(null)}>
+          <div
+            className="modal-card availability-day-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="availability-day-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="availability-day-heading">{formatDateDisplay(inspectedDate)}</h2>
+            <p>Availability snapshot for the selected matchup teams on this date.</p>
+            <OverviewStatusList
+              title="Available"
+              entries={inspectedDateDetails.available}
+              emptyText="No players are marked available on this date."
+            />
+            <OverviewStatusList
+              title="Blocked"
+              entries={inspectedDateDetails.blocked}
+              emptyText="No players have blocked this date."
+            />
+            <OverviewStatusList
+              title="No update"
+              entries={inspectedDateDetails.missing}
+              emptyText="Everyone selected has posted an update for this date."
+            />
+            <div className="actions">
+              <button type="button" className="secondary" onClick={() => setInspectedDate(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OverviewStatusList({
+  title,
+  entries,
+  emptyText,
+}: {
+  title: string;
+  entries: Array<{ name: string; teamLabel: string }>;
+  emptyText: string;
+}) {
+  return (
+    <div className="overview-status-group">
+      <h4>{title}</h4>
+      {entries.length ? (
+        <ul className="overview-status-list">
+          {entries.map((entry) => (
+            <li key={`${title}-${entry.teamLabel}-${entry.name}`}>
+              <b>{entry.name}</b>
+              <span>{entry.teamLabel}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="availability-note">{emptyText}</p>
       )}
     </div>
   );

@@ -21,6 +21,7 @@ export type DateParticipantStatus = {
 interface MultiDateCalendarProps {
   selectedDates: DateString[];
   onDateToggle: (date: DateString) => void;
+  onDateInspect?: (date: DateString) => void;
   availabilityMap: Map<DateString, DayAvailability>;
   blockingMap: Map<DateString, DayBlock>;
   matchDates: DateString[];
@@ -37,6 +38,7 @@ const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(
 export function MultiDateCalendar({
   selectedDates,
   onDateToggle,
+  onDateInspect,
   availabilityMap,
   blockingMap,
   matchDates,
@@ -59,9 +61,14 @@ export function MultiDateCalendar({
   };
 
   const handleDateClick = (date: Date) => {
+    const dateStr = normalizeDate(date);
     const info = getDateInfo(date);
-    if (readOnly || isDateDisabled(info.state)) return;
-    onDateToggle(normalizeDate(date));
+    if (readOnly) {
+      onDateInspect?.(dateStr);
+      return;
+    }
+    if (isDateDisabled(info.state)) return;
+    onDateToggle(dateStr);
   };
 
   const canGoPrev = startOfMonth(viewMonth) > startOfMonth(rangeStart);
@@ -99,6 +106,7 @@ export function MultiDateCalendar({
         onDateToggle={handleDateClick}
         getDateInfo={getDateInfo}
         participantStatusMap={participantStatusMap}
+        onDateInspect={onDateInspect}
         readOnly={readOnly}
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
@@ -113,6 +121,7 @@ interface CalendarGridProps {
   onDateToggle: (date: Date) => void;
   getDateInfo: (date: Date) => { state: DateState; disabledReason: DisabledReason };
   participantStatusMap: Map<DateString, DateParticipantStatus>;
+  onDateInspect?: (date: DateString) => void;
   readOnly: boolean;
   rangeStart: Date;
   rangeEnd: Date;
@@ -124,6 +133,7 @@ function CalendarGrid({
   onDateToggle,
   getDateInfo,
   participantStatusMap,
+  onDateInspect,
   readOnly,
   rangeStart,
   rangeEnd,
@@ -173,6 +183,7 @@ function CalendarGrid({
               onDateToggle={onDateToggle}
               getDateInfo={getDateInfo}
               participantStatusMap={participantStatusMap}
+              onDateInspect={onDateInspect}
               readOnly={readOnly}
             />
           ))}
@@ -188,6 +199,7 @@ interface CalendarDayProps {
   onDateToggle: (date: Date) => void;
   getDateInfo: (date: Date) => { state: DateState; disabledReason: DisabledReason };
   participantStatusMap: Map<DateString, DateParticipantStatus>;
+  onDateInspect?: (date: DateString) => void;
   readOnly: boolean;
 }
 
@@ -197,6 +209,7 @@ function CalendarDay({
   onDateToggle,
   getDateInfo,
   participantStatusMap,
+  onDateInspect,
   readOnly,
 }: CalendarDayProps) {
   if (!date) {
@@ -206,7 +219,7 @@ function CalendarDay({
   const dateStr = normalizeDate(date);
   const isSelected = selectedDates.includes(dateStr);
   const info = getDateInfo(date);
-  const disabled = readOnly || isDateDisabled(info.state);
+  const disabled = readOnly ? false : isDateDisabled(info.state);
   const reasonLabel = getDisabledReasonLabel(info.disabledReason);
   const participants = participantStatusMap.get(dateStr);
   const stateLabel = isSelected
@@ -238,7 +251,13 @@ function CalendarDay({
     <button
       type="button"
       className={`calendar-day state-${info.state} ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-      onClick={() => !disabled && onDateToggle(date)}
+      onClick={() => {
+        if (readOnly) {
+          onDateInspect?.(dateStr);
+          return;
+        }
+        if (!disabled) onDateToggle(date);
+      }}
       disabled={disabled}
       title={title}
       aria-label={`${formatTitle(date)}, ${stateLabel}${reasonLabel ? `, ${reasonLabel}` : ''}`}

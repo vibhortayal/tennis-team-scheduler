@@ -154,6 +154,7 @@ export function Styles() {
       .calendar-day.state-match{background:#f1f2ef;border-color:#c7cec8;color:#758278}
       .calendar-day.selected{outline:2px solid #147a42;outline-offset:-2px}
       .calendar-day.disabled{cursor:not-allowed;opacity:.75}
+      .calendar-day:not(.disabled){cursor:pointer}
       .calendar-day:not(.disabled):not(.empty):hover{border-color:#147a42}
 
       .date-state-legend{margin-top:10px}
@@ -166,6 +167,12 @@ export function Styles() {
       .legend-color.state-blocked{background:#fff3ed;border-color:#d94924}
       .legend-color.state-blocked-all-day{background:#f1f2ef;border-color:#c7cec8}
       .legend-color.state-match{background:#f1f2ef;border-color:#c7cec8}
+      .availability-day-modal{width:min(640px,100%)}
+      .overview-status-group{margin-top:18px}
+      .overview-status-group h4{margin:0 0 8px;color:#17663d}
+      .overview-status-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+      .overview-status-list li{display:grid;gap:2px;padding:10px;border:1px solid #d6dfd5;border-radius:8px;background:#f8fbf7}
+      .overview-status-list span{font-size:12px;color:#47614d}
 
       /* === Pending day editors === */
       .pending-day-editors{display:grid;gap:10px;margin-top:12px}
