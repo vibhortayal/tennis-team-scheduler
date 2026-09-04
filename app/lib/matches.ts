@@ -19,6 +19,8 @@ export type Suggestion = {
   date: string;
   startsAt?: string;
   endsAt?: string;
+  isPlaceholder?: boolean;
+  note?: string;
   alternateCount?: number;
   missingPlayers?: string[];
   allPlayersReady?: boolean;

@@ -156,50 +156,47 @@ export default function Page() {
     setAvailability(slots.filter((slot) => slot.playerId === playerKey));
   }, []);
 
-  const fetchAvailabilitySnapshot = useCallback(
-    async (player: Identity) => {
-      if (player.viewing || !availabilityApi || !key) {
-        return [] as AvailabilitySlot[];
-      }
-      try {
-        const playerKeys = groups[player.group].flatMap(([teamId]) =>
-          playerKeysForTeam(player.group, teamId)
-        );
-        const rosterFilter = playerKeys
-          .map((playerKey) => `player_key.eq.${encodeURIComponent(playerKey)}`)
-          .join(',');
-        const response = await fetch(
-          `${availabilityApi}?or=(${rosterFilter})&select=*&order=starts_at.asc`,
-          { headers }
-        );
-        if (!response.ok) throw new Error('Could not load availability.');
-        const rows = (await response.json()) as Array<{
-          id: string;
-          player_key: string;
-          starts_at: string;
-          ends_at: string;
-          kind?: 'available' | 'blocked';
-          mode?: 'anytime' | 'time_windows' | 'all_day';
-          created_at?: string;
-          updated_at?: string;
-        }>;
-        const parsed = rows.map((row) => ({
-          id: row.id,
-          playerId: row.player_key,
-          startsAt: row.starts_at,
-          endsAt: row.ends_at,
-          kind: row.kind ?? 'available',
-          mode: row.mode ?? 'time_windows',
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        }));
-        return parsed;
-      } catch {
-        return null;
-      }
-    },
-    [availabilityApi, key]
-  );
+  const fetchAvailabilitySnapshot = useCallback(async (player: Identity) => {
+    if (player.viewing || !availabilityApi || !key) {
+      return [] as AvailabilitySlot[];
+    }
+    try {
+      const playerKeys = groups[player.group].flatMap(([teamId]) =>
+        playerKeysForTeam(player.group, teamId)
+      );
+      const rosterFilter = playerKeys
+        .map((playerKey) => `player_key.eq.${encodeURIComponent(playerKey)}`)
+        .join(',');
+      const response = await fetch(
+        `${availabilityApi}?or=(${rosterFilter})&select=*&order=starts_at.asc`,
+        { headers }
+      );
+      if (!response.ok) throw new Error('Could not load availability.');
+      const rows = (await response.json()) as Array<{
+        id: string;
+        player_key: string;
+        starts_at: string;
+        ends_at: string;
+        kind?: 'available' | 'blocked';
+        mode?: 'anytime' | 'time_windows' | 'all_day';
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      const parsed = rows.map((row) => ({
+        id: row.id,
+        playerId: row.player_key,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        kind: row.kind ?? 'available',
+        mode: row.mode ?? 'time_windows',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const loadAvailability = useCallback(
     async (player: Identity) => {
@@ -221,7 +218,7 @@ export default function Page() {
         return null;
       }
     },
-    [applyAvailabilitySnapshot, availabilityApi, fetchAvailabilitySnapshot, key]
+    [applyAvailabilitySnapshot, fetchAvailabilitySnapshot]
   );
 
   useEffect(() => {
@@ -475,7 +472,10 @@ export default function Page() {
         );
 
     return filtered.sort(
-      (a, b) => a.date.localeCompare(b.date) || a.opponentId.localeCompare(b.opponentId)
+      (a, b) =>
+        (a.date || '9999-12-31').localeCompare(b.date || '9999-12-31') ||
+        Number(a.isPlaceholder) - Number(b.isPlaceholder) ||
+        a.opponentId.localeCompare(b.opponentId)
     );
   }, [suggestions, suggestionOpponent]);
 
@@ -633,6 +633,7 @@ export default function Page() {
         .map((player, index) => ({ player, name: participantNames[index] }))
         .filter(({ player }) => !(slotMap.get(player) || []).length)
         .map(({ name }) => name);
+      const opponentCandidates: Suggestion[] = [];
       const starts = windows
         .flatMap((window) => generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES))
         .filter(
@@ -697,7 +698,7 @@ export default function Page() {
           return;
         }
 
-        candidates.push({
+        opponentCandidates.push({
           opponentId,
           date,
           startsAt: start.toISOString(),
@@ -716,17 +717,41 @@ export default function Page() {
           score: yourGap + opponentGap,
         });
       });
+
+      if (opponentCandidates.length > 0) {
+        candidates.push(...opponentCandidates);
+        continue;
+      }
+
+      candidates.push({
+        opponentId,
+        date: '',
+        isPlaceholder: true,
+        note: missingPlayers.length
+          ? `Availability is still needed from ${missingPlayers.join(' and ')}.`
+          : 'No shared time is available yet for this matchup.',
+        missingPlayers,
+        allPlayersReady: missingPlayers.length === 0,
+        playersWithAvailability,
+        totalPlayers: participants.length,
+        yourGap: 99,
+        opponentGap: 99,
+        score: Number.MAX_SAFE_INTEGER,
+      });
     }
 
     const ranked = rankMatchSuggestions(candidates);
+    const suggestedCount = ranked.filter((item) => !item.isPlaceholder).length;
 
     setSuggestions(ranked);
     setSuggestionOpponent('');
 
     setSuggestionNote(
-      ranked.length
-        ? `We found ${ranked.length} suggested match times before September 30.`
-        : 'No shared time is available yet. Add more time windows before September 30 to improve your options.'
+      suggestedCount
+        ? `We found ${suggestedCount} suggested match time${suggestedCount === 1 ? '' : 's'} before September 30.`
+        : ranked.length
+          ? 'No shared time is available yet, but the cards below show who still needs to update availability.'
+          : 'No shared time is available yet. Add more time windows before September 30 to improve your options.'
     );
   };
 

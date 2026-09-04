@@ -477,7 +477,13 @@ export function SmartScheduling({
                     key={`${suggestion.opponentId}-${suggestion.date}`}
                   >
                     <small>
-                      {suggestion.allPlayersReady ? 'READY TO PROPOSE' : 'POSSIBLE TIME'}
+                      {suggestion.isPlaceholder
+                        ? suggestion.missingPlayers?.length
+                          ? 'WAITING FOR UPDATES'
+                          : 'NO SHARED TIME YET'
+                        : suggestion.allPlayersReady
+                          ? 'READY TO PROPOSE'
+                          : 'POSSIBLE TIME'}
                     </small>
 
                     <div className="matchup">
@@ -490,49 +496,61 @@ export function SmartScheduling({
                       />
                     </div>
 
-                    <p>
-                      <b>{dateText(suggestion.date)}</b>
-                      <br />
-                      Suggested time:{' '}
-                      {suggestion.startsAt
-                        ? new Intl.DateTimeFormat('en-US', {
-                            timeStyle: 'short',
-                            timeZone: 'America/Los_Angeles',
-                          }).format(new Date(suggestion.startsAt))
-                        : '7:00 PM'}{' '}
-                      -{' '}
-                      {suggestion.endsAt
-                        ? new Intl.DateTimeFormat('en-US', {
-                            timeStyle: 'short',
-                            timeZone: 'America/Los_Angeles',
-                          }).format(new Date(suggestion.endsAt))
-                        : ''}
-                    </p>
+                    {suggestion.isPlaceholder ? (
+                      <p>
+                        <b>{suggestion.note}</b>
+                      </p>
+                    ) : (
+                      <>
+                        <p>
+                          <b>{dateText(suggestion.date)}</b>
+                          <br />
+                          Suggested time:{' '}
+                          {suggestion.startsAt
+                            ? new Intl.DateTimeFormat('en-US', {
+                                timeStyle: 'short',
+                                timeZone: 'America/Los_Angeles',
+                              }).format(new Date(suggestion.startsAt))
+                            : '7:00 PM'}{' '}
+                          -{' '}
+                          {suggestion.endsAt
+                            ? new Intl.DateTimeFormat('en-US', {
+                                timeStyle: 'short',
+                                timeZone: 'America/Los_Angeles',
+                              }).format(new Date(suggestion.endsAt))
+                            : ''}
+                        </p>
 
-                    <p className="gap-text">
-                      Your rest:{' '}
-                      {suggestion.yourGap === 99 ? 'No nearby match' : `${suggestion.yourGap} days`}
-                      <br />
-                      Opponent rest:{' '}
-                      {suggestion.opponentGap === 99
-                        ? 'No nearby match'
-                        : `${suggestion.opponentGap} days`}
-                    </p>
+                        <p className="gap-text">
+                          Your rest:{' '}
+                          {suggestion.yourGap === 99
+                            ? 'No nearby match'
+                            : `${suggestion.yourGap} days`}
+                          <br />
+                          Opponent rest:{' '}
+                          {suggestion.opponentGap === 99
+                            ? 'No nearby match'
+                            : `${suggestion.opponentGap} days`}
+                        </p>
+                      </>
+                    )}
                     <p className="availability-check-note">
                       Availability updated by {suggestion.playersWithAvailability ?? 0}/
                       {suggestion.totalPlayers ?? 4} players.
                     </p>
-                    <p className="gap-text">
-                      Your previous game: {gameSummary(suggestion.yourPreviousGame)}
-                      <br />
-                      Your next game: {gameSummary(suggestion.yourNextGame)}
-                      <br />
-                      Opponent previous game: {gameSummary(suggestion.opponentPreviousGame)}
-                      <br />
-                      Opponent next game: {gameSummary(suggestion.opponentNextGame)}
-                    </p>
+                    {!suggestion.isPlaceholder && (
+                      <p className="gap-text">
+                        Your previous game: {gameSummary(suggestion.yourPreviousGame)}
+                        <br />
+                        Your next game: {gameSummary(suggestion.yourNextGame)}
+                        <br />
+                        Opponent previous game: {gameSummary(suggestion.opponentPreviousGame)}
+                        <br />
+                        Opponent next game: {gameSummary(suggestion.opponentNextGame)}
+                      </p>
+                    )}
 
-                    {suggestion.alternateCount ? (
+                    {suggestion.alternateCount && !suggestion.isPlaceholder ? (
                       <p>
                         {suggestion.alternateCount} alternate time
                         {suggestion.alternateCount === 1 ? '' : 's'} available
@@ -547,18 +565,20 @@ export function SmartScheduling({
                       <p className="ready-availability">All players available - schedule now.</p>
                     )}
 
-                    <button
-                      onClick={() => onSchedule(suggestion)}
-                      title={
-                        suggestion.allPlayersReady
-                          ? 'Open the proposal flow'
-                          : 'Confirmed by players over chat'
-                      }
-                    >
-                      {suggestion.allPlayersReady
-                        ? 'Propose this time'
-                        : 'Confirmed by players over chat'}
-                    </button>
+                    {!suggestion.isPlaceholder && (
+                      <button
+                        onClick={() => onSchedule(suggestion)}
+                        title={
+                          suggestion.allPlayersReady
+                            ? 'Open the proposal flow'
+                            : 'Confirmed by players over chat'
+                        }
+                      >
+                        {suggestion.allPlayersReady
+                          ? 'Propose this time'
+                          : 'Confirmed by players over chat'}
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>
