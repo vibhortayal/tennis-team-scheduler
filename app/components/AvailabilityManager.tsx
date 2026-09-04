@@ -152,6 +152,7 @@ export function AvailabilityManager({
           blockingMap={blockingMap}
           matchDates={matchDates}
           participantStatusMap={participantStatusMap}
+          participantKeys={participantKeys}
           readOnly={readOnly}
           minDate={minDate}
           maxDate={maxDate}
