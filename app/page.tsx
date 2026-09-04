@@ -810,6 +810,7 @@ export default function Page() {
           pendingOpponentIds={pendingOpponentIds}
           opponentMissingNames={opponentMissingNames}
           availabilityOpponents={availabilityOpponents}
+          allAvailability={allAvailability}
           onAvailabilityOpponentToggle={(opponentId) =>
             setAvailabilityOpponents((current) =>
               current.includes(opponentId)

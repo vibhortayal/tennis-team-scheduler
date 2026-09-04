@@ -101,6 +101,13 @@ export function Styles() {
       .suggestion-step{margin-top:18px}
       .suggestion-step h3{margin:0 0 8px;font-size:14px}
       .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
+      .availability-checker{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
+      .availability-check-results{margin-top:10px;padding:10px;border:1px solid #d6dfd5;border-radius:10px;background:#fff}
+      .availability-check-note{margin:0 !important;color:#47614d !important;font-size:13px;font-weight:700}
+      .availability-team-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+      .availability-team{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}
+      .availability-team--ready{background:#eaf4eb;color:#17663d}
+      .availability-team--not-ready{background:#fff3ed;color:#8c351f}
       .known-team{padding:12px;border:1px solid #cbdccd;border-radius:10px;background:#f1f7f1;color:#17663d;font-weight:800}
       .known-team small{display:block;margin-bottom:4px;color:#5f7064;font-size:11px;letter-spacing:.7px}
       .known-team-note{font-size:12px;color:#8a9d8e;margin-top:6px !important;font-weight:400}
@@ -306,7 +313,7 @@ export function Styles() {
         .tabs{overflow-x:auto;scrollbar-width:none}
         .tabs::-webkit-scrollbar{display:none}
         .tabs button{flex:0 0 auto;min-width:max-content}
-        .grid,.fields,.suggestion-fields{grid-template-columns:1fr}
+        .grid,.fields,.suggestion-fields,.availability-checker{grid-template-columns:1fr}
         .pending-matchup-list{grid-template-columns:1fr}
         .availability-form{grid-template-columns:1fr}
         .wide{grid-column:auto}

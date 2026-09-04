@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Group, Identity, teamDisplay, teamNames } from '../teams';
 import { Match, Suggestion, dateText } from '../lib/matches';
 import { AvailabilityManager, AvailabilitySlot, SlotSaveInput } from './AvailabilityManager';
 import { TeamContext } from './MatchCard';
+import {
+  DEFAULT_MATCH_DURATION_MINUTES,
+  effectiveWindowsForPlayer,
+  generateSuggestedStarts,
+  intersectTimeWindows,
+  playerKeysForTeam,
+} from '../lib/scheduling';
+import { getPlayableTimeWindows } from '../lib/availabilityHelpers';
 
 type SmartSchedulingProps = {
   identity: Identity;
@@ -36,6 +44,7 @@ type SmartSchedulingProps = {
   opponentMissingNames: string[];
   availabilityOpponents: string[];
   onAvailabilityOpponentToggle: (value: string) => void;
+  allAvailability: AvailabilitySlot[];
 };
 
 export function SmartScheduling({
@@ -70,14 +79,73 @@ export function SmartScheduling({
   opponentMissingNames,
   availabilityOpponents,
   onAvailabilityOpponentToggle,
+  allAvailability,
 }: SmartSchedulingProps) {
   const [schedulingTab, setSchedulingTab] = useState<'overview' | 'availability'>('overview');
+  const [availabilityCheckDate, setAvailabilityCheckDate] = useState('');
+  const [availabilityCheckSlot, setAvailabilityCheckSlot] = useState('');
   const initials = identity.name
     .split(' ')
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+  const slotOptions = useMemo(
+    () => (availabilityCheckDate ? getPlayableTimeWindows(availabilityCheckDate) : []),
+    [availabilityCheckDate]
+  );
+  const selectedSlotRange = useMemo(() => {
+    if (!availabilityCheckDate || !availabilityCheckSlot) return null;
+    const [start, end] = availabilityCheckSlot.split('-');
+    const startsAt = new Date(`${availabilityCheckDate}T${start}:00`);
+    const endsAt = new Date(`${availabilityCheckDate}T${end}:00`);
+    if (
+      Number.isNaN(startsAt.valueOf()) ||
+      Number.isNaN(endsAt.valueOf()) ||
+      endsAt <= startsAt
+    ) {
+      return null;
+    }
+    return { startsAt, endsAt };
+  }, [availabilityCheckDate, availabilityCheckSlot]);
+  const slotHasMatchDuration = useMemo(() => {
+    if (!selectedSlotRange) return false;
+    return (
+      selectedSlotRange.endsAt.valueOf() - selectedSlotRange.startsAt.valueOf() >=
+      DEFAULT_MATCH_DURATION_MINUTES * 60_000
+    );
+  }, [selectedSlotRange]);
+  const availableTeamsForSlot = useMemo(() => {
+    if (!selectedSlotRange || !slotHasMatchDuration || !suggestionTeam) return [];
+    const canPlayWithinSlot = (participantKeys: string[]) => {
+      const participantWindows = participantKeys.map((playerKey) => {
+        const slots = allAvailability.filter((slot) => slot.playerId === playerKey);
+        return effectiveWindowsForPlayer(slots);
+      });
+      const sharedWindows = intersectTimeWindows(participantWindows);
+      return sharedWindows.some((window) =>
+        generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES).some((start) => {
+          const end = new Date(start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60_000);
+          return start >= selectedSlotRange.startsAt && end <= selectedSlotRange.endsAt;
+        })
+      );
+    };
+    const yourPlayers = playerKeysForTeam(scheduleGroup, suggestionTeam);
+    return pendingOpponentIds.filter((opponentId) =>
+      canPlayWithinSlot([...yourPlayers, ...playerKeysForTeam(scheduleGroup, opponentId)])
+    );
+  }, [
+    allAvailability,
+    pendingOpponentIds,
+    scheduleGroup,
+    selectedSlotRange,
+    slotHasMatchDuration,
+    suggestionTeam,
+  ]);
+  const unavailableTeamsForSlot = useMemo(
+    () => pendingOpponentIds.filter((teamId) => !availableTeamsForSlot.includes(teamId)),
+    [availableTeamsForSlot, pendingOpponentIds]
+  );
 
   return (
     <section className="suggestions-panel">
@@ -224,6 +292,73 @@ export function SmartScheduling({
                 )}
               </div>
             )}
+
+            <div className="suggestion-step">
+              <h3>Quick availability check</h3>
+              <p>Select a date and slot to see which teams can play you in that window.</p>
+              <div className="availability-checker">
+                <label className="field">
+                  Date
+                  <input
+                    type="date"
+                    value={availabilityCheckDate}
+                    onChange={(event) => {
+                      const nextDate = event.target.value;
+                      const nextSlots = nextDate ? getPlayableTimeWindows(nextDate) : [];
+                      setAvailabilityCheckDate(nextDate);
+                      setAvailabilityCheckSlot(nextSlots[0]?.value ?? '');
+                    }}
+                  />
+                </label>
+                <label className="field">
+                  Slot
+                  <select
+                    value={availabilityCheckSlot}
+                    onChange={(event) => setAvailabilityCheckSlot(event.target.value)}
+                    disabled={!availabilityCheckDate}
+                  >
+                    <option value="">Select slot</option>
+                    {slotOptions.map((slot) => (
+                      <option key={slot.value} value={slot.value}>
+                        {slot.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {availabilityCheckDate && availabilityCheckSlot && !slotHasMatchDuration && (
+                <p className="availability-check-note">
+                  This slot is shorter than {DEFAULT_MATCH_DURATION_MINUTES / 60} hours.
+                </p>
+              )}
+              {availabilityCheckDate && availabilityCheckSlot && slotHasMatchDuration && (
+                <div className="availability-check-results" role="status">
+                  <p className="availability-check-note">
+                    {availableTeamsForSlot.length > 0
+                      ? `${availableTeamsForSlot.length} team${availableTeamsForSlot.length === 1 ? '' : 's'} available in this slot.`
+                      : 'No pending teams are fully available in this slot yet.'}
+                  </p>
+                  {availableTeamsForSlot.length > 0 && (
+                    <div className="availability-team-list">
+                      {availableTeamsForSlot.map((teamId) => (
+                        <span className="availability-team availability-team--ready" key={teamId}>
+                          {teamDisplay(scheduleGroup, teamId)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {unavailableTeamsForSlot.length > 0 && (
+                    <div className="availability-team-list">
+                      {unavailableTeamsForSlot.map((teamId) => (
+                        <span className="availability-team availability-team--not-ready" key={teamId}>
+                          {teamDisplay(scheduleGroup, teamId)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="suggestion-step">
               <h3>Set rest-day rules</h3>
