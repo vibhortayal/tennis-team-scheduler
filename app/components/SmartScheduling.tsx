@@ -140,17 +140,21 @@ export function SmartScheduling({
   const availableTeamsForSlot = useMemo(() => {
     if (!selectedSlotRange || !slotHasMatchDuration || !suggestionTeam) return [];
     const canPlayWithinSlot = (participantKeys: string[]) => {
-      // Only include players who have submitted at least one available slot.
-      // Players with no record are treated as "unknown" (not unavailable),
-      // so they are excluded from the intersection rather than zeroing it out.
-      const participantWindows = participantKeys
-        .filter((playerKey) =>
-          (availabilityByPlayer.get(playerKey) || []).some(
-            (s) => (s.kind ?? 'available') === 'available'
-          )
+      const playersWithAvailability = participantKeys.filter((playerKey) =>
+        (availabilityByPlayer.get(playerKey) || []).some(
+          (slot) => (slot.kind ?? 'available') === 'available'
         )
-        .map((playerKey) => effectiveWindowsForPlayer(availabilityByPlayer.get(playerKey) || []));
+      );
+
+      if (playersWithAvailability.length === 0) {
+        return true;
+      }
+
+      const participantWindows = playersWithAvailability.map((playerKey) =>
+        effectiveWindowsForPlayer(availabilityByPlayer.get(playerKey) || [])
+      );
       const sharedWindows = intersectTimeWindows(participantWindows);
+
       return sharedWindows.some((window) =>
         generateSuggestedStarts(window, DEFAULT_MATCH_DURATION_MINUTES).some((start) => {
           const end = new Date(start.valueOf() + DEFAULT_MATCH_DURATION_MINUTES * 60_000);

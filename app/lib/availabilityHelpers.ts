@@ -467,3 +467,39 @@ export const getScheduleDateSummary = ({
     noResponseCount,
   };
 };
+
+export type SlotAvailabilityStatus = 'available' | 'unknown' | 'unavailable';
+
+export const getSlotAvailabilityStatus = (
+  slots: AvailabilitySlot[],
+  dateStr: DateString,
+  window: string
+): SlotAvailabilityStatus => {
+  const availabilityMap = buildAvailabilityMap(slots);
+  const blockingMap = buildBlockingMap(slots);
+
+  const block = blockingMap.get(dateStr);
+
+  if (
+    block?.mode === 'all_day' ||
+    block?.timeWindows?.some((blockedWindow) => doTimeWindowsOverlap(blockedWindow, window))
+  ) {
+    return 'unavailable';
+  }
+
+  const availability = availabilityMap.get(dateStr);
+
+  if (!availability) {
+    return 'unknown';
+  }
+
+  if (availability.mode === 'anytime') {
+    return 'available';
+  }
+
+  return availability.timeWindows?.some((availableWindow) =>
+    doTimeWindowsOverlap(availableWindow, window)
+  )
+    ? 'available'
+    : 'unavailable';
+};
