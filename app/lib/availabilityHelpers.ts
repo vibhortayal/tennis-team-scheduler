@@ -24,6 +24,7 @@ export interface DayBlock {
 
 export type DateState =
   'normal' | 'available' | 'available-anytime' | 'blocked' | 'blocked-all-day' | 'match';
+
 export type DisabledReason = 'blocked-all-day' | 'available-anytime' | 'match-day' | 'none';
 
 export type TimeWindowOption = { label: string; value: string };
@@ -87,17 +88,21 @@ export const doTimeWindowsOverlap = (window1: string, window2: string): boolean 
 export const formatWindowLabel = (window: string): string => {
   const [start, end] = window.split('-');
   const label = (time: string) =>
-    new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(
-      new Date(`2000-01-01T${time}:00`)
-    );
+    new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(`2000-01-01T${time}:00`));
+
   return `${label(start)} – ${label(end)}`;
 };
 
 /** Format a date string for display (e.g., "Sat, Sep 12"). */
 export const formatDateDisplay = (dateStr: DateString): string =>
-  new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(
-    new Date(`${dateStr}T12:00:00`)
-  );
+  new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(`${dateStr}T12:00:00`));
 
 /** ISO bounds representing the full playable day for "anytime"/"all day" entries. */
 export const fullDayWindow = (dateStr: DateString): { startsAt: string; endsAt: string } => ({
@@ -111,6 +116,7 @@ export const windowToIso = (
   window: string
 ): { startsAt: string; endsAt: string } => {
   const [start, end] = window.split('-');
+
   return {
     startsAt: new Date(`${dateStr}T${start}:00`).toISOString(),
     endsAt: new Date(`${dateStr}T${end}:00`).toISOString(),
@@ -122,7 +128,10 @@ export const timeWindowFromSlot = (slot: AvailabilitySlot): string => {
   const start = new Date(slot.startsAt);
   const end = new Date(slot.endsAt);
   const pad = (value: number) => String(value).padStart(2, '0');
-  return `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+  return `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(
+    end.getHours()
+  )}:${pad(end.getMinutes())}`;
 };
 
 /** Identify all scheduled/completed match dates from a match array (not unscheduled suggestions). */
@@ -153,42 +162,74 @@ export const buildAvailabilityMap = (
   slots: AvailabilitySlot[]
 ): Map<DateString, DayAvailability> => {
   const map = new Map<DateString, DayAvailability>();
+
   slots
     .filter((slot) => (slot.kind ?? 'available') === 'available')
     .forEach((slot) => {
       const date = normalizeDate(slot.startsAt);
+
       if ((slot.mode ?? 'time_windows') === 'anytime') {
         map.set(date, { date, mode: 'anytime' });
         return;
       }
+
       const existing = map.get(date);
-      if (existing?.mode === 'anytime') return;
+
+      if (existing?.mode === 'anytime') {
+        return;
+      }
+
       const windows = existing?.timeWindows ? [...existing.timeWindows] : [];
       const window = timeWindowFromSlot(slot);
-      if (!windows.includes(window)) windows.push(window);
-      map.set(date, { date, mode: 'time_windows', timeWindows: windows });
+
+      if (!windows.includes(window)) {
+        windows.push(window);
+      }
+
+      map.set(date, {
+        date,
+        mode: 'time_windows',
+        timeWindows: windows,
+      });
     });
+
   return map;
 };
 
 /** Build a date -> block map (mode + time windows) from a player's "blocked" slots. */
 export const buildBlockingMap = (slots: AvailabilitySlot[]): Map<DateString, DayBlock> => {
   const map = new Map<DateString, DayBlock>();
+
   slots
     .filter((slot) => (slot.kind ?? 'available') === 'blocked')
     .forEach((slot) => {
       const date = normalizeDate(slot.startsAt);
+
       if ((slot.mode ?? 'time_windows') === 'all_day') {
         map.set(date, { date, mode: 'all_day' });
         return;
       }
+
       const existing = map.get(date);
-      if (existing?.mode === 'all_day') return;
+
+      if (existing?.mode === 'all_day') {
+        return;
+      }
+
       const windows = existing?.timeWindows ? [...existing.timeWindows] : [];
       const window = timeWindowFromSlot(slot);
-      if (!windows.includes(window)) windows.push(window);
-      map.set(date, { date, mode: 'time_windows', timeWindows: windows });
+
+      if (!windows.includes(window)) {
+        windows.push(window);
+      }
+
+      map.set(date, {
+        date,
+        mode: 'time_windows',
+        timeWindows: windows,
+      });
     });
+
   return map;
 };
 
@@ -199,13 +240,24 @@ export const getAvailabilityDateState = (
   blockingMap: Map<DateString, DayBlock>,
   matchDates: DateString[]
 ): { state: DateState; disabledReason: DisabledReason } => {
-  if (isMatchDay(dateStr, matchDates)) return { state: 'match', disabledReason: 'match-day' };
-  if (isBlockedAllDay(dateStr, blockingMap))
+  if (isMatchDay(dateStr, matchDates)) {
+    return { state: 'match', disabledReason: 'match-day' };
+  }
+
+  if (isBlockedAllDay(dateStr, blockingMap)) {
     return { state: 'blocked-all-day', disabledReason: 'blocked-all-day' };
+  }
 
   const available = availabilityMap.get(dateStr);
-  if (available?.mode === 'anytime') return { state: 'available-anytime', disabledReason: 'none' };
-  if (available) return { state: 'available', disabledReason: 'none' };
+
+  if (available?.mode === 'anytime') {
+    return { state: 'available-anytime', disabledReason: 'none' };
+  }
+
+  if (available) {
+    return { state: 'available', disabledReason: 'none' };
+  }
+
   return { state: 'normal', disabledReason: 'none' };
 };
 
@@ -216,13 +268,24 @@ export const getBlockingDateState = (
   blockingMap: Map<DateString, DayBlock>,
   matchDates: DateString[]
 ): { state: DateState; disabledReason: DisabledReason } => {
-  if (isMatchDay(dateStr, matchDates)) return { state: 'match', disabledReason: 'match-day' };
-  if (isAvailableAnytime(dateStr, availabilityMap))
+  if (isMatchDay(dateStr, matchDates)) {
+    return { state: 'match', disabledReason: 'match-day' };
+  }
+
+  if (isAvailableAnytime(dateStr, availabilityMap)) {
     return { state: 'available-anytime', disabledReason: 'available-anytime' };
+  }
 
   const blocked = blockingMap.get(dateStr);
-  if (blocked?.mode === 'all_day') return { state: 'blocked-all-day', disabledReason: 'none' };
-  if (blocked) return { state: 'blocked', disabledReason: 'none' };
+
+  if (blocked?.mode === 'all_day') {
+    return { state: 'blocked-all-day', disabledReason: 'none' };
+  }
+
+  if (blocked) {
+    return { state: 'blocked', disabledReason: 'none' };
+  }
+
   return { state: 'normal', disabledReason: 'none' };
 };
 
@@ -274,17 +337,26 @@ export const validateAvailabilityBlockingConflict = (
 ): { valid: boolean; error?: string } => {
   const availability = availabilityMap.get(dateStr);
   const blocking = blockingMap.get(dateStr);
-  if (!availability || !blocking) return { valid: true };
+
+  if (!availability || !blocking) {
+    return { valid: true };
+  }
 
   if (availability.mode === 'anytime' || blocking.mode === 'all_day') {
-    return { valid: false, error: 'Cannot be both available and blocked on the same date.' };
+    return {
+      valid: false,
+      error: 'Cannot be both available and blocked on the same date.',
+    };
   }
 
   if (availability.timeWindows && blocking.timeWindows) {
     for (const availWindow of availability.timeWindows) {
       for (const blockWindow of blocking.timeWindows) {
         if (doTimeWindowsOverlap(availWindow, blockWindow)) {
-          return { valid: false, error: 'Availability and blocking time windows overlap.' };
+          return {
+            valid: false,
+            error: 'Availability and blocking time windows overlap.',
+          };
         }
       }
     }
@@ -303,8 +375,8 @@ export const hasOverlappingWindows = (
  * Eligibility rule for match search / smart scheduling.
  *
  * A team remains visible (eligible) for a searched date unless at least one
- * of its players has *explicitly* submitted a blocked/unavailable record for
- * that date.  A missing availability record ("unknown") does NOT disqualify a
+ * of its players has explicitly submitted a blocked/unavailable record for
+ * that date. A missing availability record ("unknown") does NOT disqualify a
  * team — only an explicit block does.
  *
  * Decision table:
@@ -323,3 +395,75 @@ export const isTeamEligibleForDate = (
       (slot) => (slot.kind ?? 'available') === 'blocked' && normalizeDate(slot.startsAt) === date
     )
   );
+
+/**
+ * UI-only status for a candidate date shown by Smart Scheduling.
+ *
+ * This does not replace `isTeamEligibleForDate`. Pass the existing
+ * eligibility result through `teamEligible`; this helper only converts
+ * established scheduling facts into player-friendly display content.
+ */
+export type ScheduleDateStatus = 'recommended' | 'possible' | 'unavailable';
+
+export type ScheduleDateSummary = {
+  status: ScheduleDateStatus;
+  availableCount: number;
+  blockedCount: number;
+  noResponseCount: number;
+  reason?: string;
+};
+
+export type ScheduleDateSummaryInput = {
+  availableCount: number;
+  blockedCount: number;
+  noResponseCount: number;
+  teamEligible: boolean;
+  hasRestDayConflict: boolean;
+  hasExistingMatchConflict: boolean;
+};
+
+export const getScheduleDateSummary = ({
+  availableCount,
+  blockedCount,
+  noResponseCount,
+  teamEligible,
+  hasRestDayConflict,
+  hasExistingMatchConflict,
+}: ScheduleDateSummaryInput): ScheduleDateSummary => {
+  if (hasRestDayConflict) {
+    return {
+      status: 'unavailable',
+      availableCount,
+      blockedCount,
+      noResponseCount,
+      reason: 'A team needs a rest day after another match.',
+    };
+  }
+
+  if (hasExistingMatchConflict) {
+    return {
+      status: 'unavailable',
+      availableCount,
+      blockedCount,
+      noResponseCount,
+      reason: 'One of these teams already has a match scheduled.',
+    };
+  }
+
+  if (!teamEligible) {
+    return {
+      status: 'unavailable',
+      availableCount,
+      blockedCount,
+      noResponseCount,
+      reason: 'At least one team is not eligible on this date.',
+    };
+  }
+
+  return {
+    status: noResponseCount > 0 ? 'possible' : 'recommended',
+    availableCount,
+    blockedCount,
+    noResponseCount,
+  };
+};

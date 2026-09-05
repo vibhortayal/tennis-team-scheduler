@@ -12,6 +12,7 @@ import {
   hasOverlappingWindows,
   isWeekend,
   validateAvailabilityBlockingConflict,
+  getScheduleDateSummary,
 } from '../app/lib/availabilityHelpers.ts';
 
 const slot = (overrides) => ({
@@ -349,4 +350,85 @@ test('details can be grouped by team using teamAvailabilityContext shape', () =>
   assert.equal(details[0].players[1].status, 'no-response'); // Bob has no record
   assert.equal(details[1].players[0].status, 'blocked'); // Carol blocked
   assert.equal(details[1].players[1].status, 'available'); // Dave available
+});
+
+test('schedule date with all responses is recommended', () => {
+  assert.deepEqual(
+    getScheduleDateSummary({
+      availableCount: 4,
+      blockedCount: 0,
+      noResponseCount: 0,
+      teamEligible: true,
+      hasRestDayConflict: false,
+      hasExistingMatchConflict: false,
+    }),
+    {
+      status: 'recommended',
+      availableCount: 4,
+      blockedCount: 0,
+      noResponseCount: 0,
+    }
+  );
+});
+
+test('schedule date with no responses is possible, not unavailable', () => {
+  assert.equal(
+    getScheduleDateSummary({
+      availableCount: 3,
+      blockedCount: 0,
+      noResponseCount: 1,
+      teamEligible: true,
+      hasRestDayConflict: false,
+      hasExistingMatchConflict: false,
+    }).status,
+    'possible'
+  );
+});
+
+test('schedule date with an ineligible team is unavailable', () => {
+  assert.deepEqual(
+    getScheduleDateSummary({
+      availableCount: 3,
+      blockedCount: 1,
+      noResponseCount: 0,
+      teamEligible: false,
+      hasRestDayConflict: false,
+      hasExistingMatchConflict: false,
+    }),
+    {
+      status: 'unavailable',
+      availableCount: 3,
+      blockedCount: 1,
+      noResponseCount: 0,
+      reason: 'At least one team is not eligible on this date.',
+    }
+  );
+});
+
+test('rest-day conflict makes a schedule date unavailable', () => {
+  assert.equal(
+    getScheduleDateSummary({
+      availableCount: 4,
+      blockedCount: 0,
+      noResponseCount: 0,
+      teamEligible: true,
+      hasRestDayConflict: true,
+      hasExistingMatchConflict: false,
+    }).reason,
+    'A team needs a rest day after another match.'
+  );
+});
+
+test('existing-match conflict makes a schedule date unavailable', () => {
+  assert.equal(
+    getScheduleDateSummary({
+      availableCount: 4,
+      blockedCount: 0,
+      noResponseCount: 0,
+      teamEligible: true,
+      hasRestDayConflict: false,
+      hasExistingMatchConflict: true,
+    }).reason,
+    'One of these teams already has a match scheduled.'
+  );
 });

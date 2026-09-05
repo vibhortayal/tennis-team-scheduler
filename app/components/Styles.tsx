@@ -130,6 +130,11 @@ export function Styles() {
       .pending-matchups-complete{margin:12px 0 0 !important;padding:10px 12px;border-radius:10px;background:#eaf4eb;color:#17663d !important;font-size:13px;font-weight:700}
       .suggestion-step{margin-top:18px}
       .suggestion-step h3{margin:0 0 8px;font-size:14px}
+      .scheduling-advanced{margin-top:18px;border:1px solid #d6dfd5;border-radius:10px;background:#fff}
+      .scheduling-advanced summary{padding:12px 14px;color:#17663d;font-size:13px;font-weight:800;cursor:pointer}
+      .scheduling-advanced[open] summary{border-bottom:1px solid #d6dfd5}
+      .scheduling-advanced .suggestion-step{padding:0 14px 14px}
+      .scheduling-advanced .suggestion-step + .suggestion-step{margin-top:0;padding-top:14px;border-top:1px solid #edf1ed}
       .suggestion-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
       .availability-checker{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-top:10px}
       .availability-check-results{margin-top:10px;padding:10px;border:1px solid #d6dfd5;border-radius:10px;background:#fff}

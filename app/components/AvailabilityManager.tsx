@@ -110,11 +110,11 @@ export function AvailabilityManager({
 
   return (
     <div className={`availability-manager ${readOnly ? 'read-only' : ''}`}>
-      <h3>{readOnly ? 'Team availability' : 'Availability & blocking'}</h3>
+      <h3>{readOnly ? 'Team availability' : 'My availability'}</h3>
       <p>
         {readOnly
           ? 'Review availability for the selected matchup teams on the calendar.'
-          : 'Pick dates on the calendar, choose &quot;anytime&quot; or specific time windows, then save. Match days are locked automatically and the two calendars stay in sync with each other.'}
+          : 'Pick dates, choose Available or Blocked, then optionally choose a time. Match days are locked automatically.'}
       </p>
       {error && <p className="error-note">{error}</p>}
       {!readOnly && (
@@ -124,14 +124,14 @@ export function AvailabilityManager({
             className={activeTab === 'availability' ? '' : 'secondary'}
             onClick={() => setActiveTab('availability')}
           >
-            Available dates
+            Available
           </button>
           <button
             type="button"
             className={activeTab === 'blocking' ? 'block-mode' : 'secondary'}
             onClick={() => setActiveTab('blocking')}
           >
-            Blocked dates
+            Blocked
           </button>
         </div>
       )}
@@ -249,12 +249,12 @@ function PickerSection({
   const modeOptions =
     pickerType === 'availability'
       ? [
-          { value: 'anytime', label: 'Available anytime' },
-          { value: 'time_windows', label: 'Specific time window(s)' },
+          { value: 'anytime', label: 'Anytime' },
+          { value: 'time_windows', label: 'Choose time' },
         ]
       : [
-          { value: 'all_day', label: 'Blocked all day' },
-          { value: 'time_windows', label: 'Specific time window(s)' },
+          { value: 'all_day', label: 'All day' },
+          { value: 'time_windows', label: 'Choose time' },
         ];
 
   const toggleDate = (date: DateString) => {
@@ -483,7 +483,7 @@ function PickerSection({
           <div className="assistant-actions">
             <span />
             <button type="button" disabled={saving} onClick={save}>
-              {pickerType === 'availability' ? 'Save availability' : 'Save blocked times'}
+              {pickerType === 'availability' ? 'Save availability' : 'Save blocked dates'}
             </button>
           </div>
         </div>
