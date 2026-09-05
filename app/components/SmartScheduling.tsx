@@ -290,7 +290,7 @@ export function SmartScheduling({
         </div>
         <div>
           <div className="eyebrow">SMART SCHEDULING</div>
-          <p>{"Keep your availability current and we'll surface times that work for everyone."}</p>
+          <p>Select teams, then choose a suggested date and time.</p>
         </div>
       </div>
 
@@ -349,114 +349,118 @@ export function SmartScheduling({
               </div>
             )}
 
-            <div className="suggestion-step">
-              <h3>Quick availability check</h3>
-              <p>Select a date and slot to see which teams can play you in that window.</p>
-              <div className="availability-checker">
-                <label className="field">
-                  Date
-                  <input
-                    type="date"
-                    value={availabilityCheckDate}
-                    onChange={(event) => {
-                      const nextDate = event.target.value;
-                      const nextSlots = nextDate ? getPlayableTimeWindows(nextDate) : [];
-                      setAvailabilityCheckDate(nextDate);
-                      setAvailabilityCheckSlot(nextSlots[0]?.value ?? '');
-                    }}
-                  />
-                </label>
-                <label className="field">
-                  Slot
-                  <select
-                    value={availabilityCheckSlot}
-                    onChange={(event) => setAvailabilityCheckSlot(event.target.value)}
-                    disabled={!availabilityCheckDate}
-                  >
-                    <option value="">Select slot</option>
-                    {slotOptions.map((slot) => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {availabilityCheckDate && availabilityCheckSlot && !slotHasMatchDuration && (
-                <p className="availability-check-note">
-                  This slot is shorter than {DEFAULT_MATCH_DURATION_MINUTES / 60} hours.
-                </p>
-              )}
-              {availabilityCheckDate && availabilityCheckSlot && slotHasMatchDuration && (
-                <div className="availability-check-results" role="status">
-                  {!suggestionTeam ? (
-                    <p className="availability-check-note">Select your player/team first.</p>
-                  ) : (
-                    <>
-                      <p className="availability-check-note">
-                        {availableTeamsForSlot.length > 0
-                          ? `${availableTeamsForSlot.length} team${availableTeamsForSlot.length === 1 ? '' : 's'} available in this slot.`
-                          : 'No pending teams are fully available in this slot yet.'}
-                      </p>
-                      {availableTeamsForSlot.length > 0 && (
-                        <div className="availability-team-list">
-                          {availableTeamsForSlot.map((teamId) => (
-                            <span
-                              className="availability-team availability-team--ready"
-                              key={teamId}
-                            >
-                              {teamDisplay(scheduleGroup, teamId)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {unavailableTeamsForSlot.length > 0 && (
-                        <div className="availability-team-list">
-                          {unavailableTeamsForSlot.map((teamId) => (
-                            <span
-                              className="availability-team availability-team--not-ready"
-                              key={teamId}
-                            >
-                              {teamDisplay(scheduleGroup, teamId)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
+            <details className="scheduling-advanced">
+              <summary>Advanced scheduling options</summary>
+
+              <div className="suggestion-step">
+                <h3>Quick availability check</h3>
+                <p>Select a date and slot to see which teams can play you in that window.</p>
+                <div className="availability-checker">
+                  <label className="field">
+                    Date
+                    <input
+                      type="date"
+                      value={availabilityCheckDate}
+                      onChange={(event) => {
+                        const nextDate = event.target.value;
+                        const nextSlots = nextDate ? getPlayableTimeWindows(nextDate) : [];
+                        setAvailabilityCheckDate(nextDate);
+                        setAvailabilityCheckSlot(nextSlots[0]?.value ?? '');
+                      }}
+                    />
+                  </label>
+                  <label className="field">
+                    Slot
+                    <select
+                      value={availabilityCheckSlot}
+                      onChange={(event) => setAvailabilityCheckSlot(event.target.value)}
+                      disabled={!availabilityCheckDate}
+                    >
+                      <option value="">Select slot</option>
+                      {slotOptions.map((slot) => (
+                        <option key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              )}
-            </div>
-
-            <div className="suggestion-step">
-              <h3>Set rest-day rules</h3>
-              <div className="suggestion-fields">
-                <label className="field">
-                  Minimum days before and after your matches
-                  <select value={yourGapDays} onChange={(e) => onYourGap(Number(e.target.value))}>
-                    {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                      <option value={days} key={days}>
-                        {days} day{days === 1 ? '' : 's'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  Minimum days before and after opponent matches
-                  <select
-                    value={opponentGapDays}
-                    onChange={(e) => onOpponentGap(Number(e.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                      <option value={days} key={days}>
-                        {days} day{days === 1 ? '' : 's'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {availabilityCheckDate && availabilityCheckSlot && !slotHasMatchDuration && (
+                  <p className="availability-check-note">
+                    This slot is shorter than {DEFAULT_MATCH_DURATION_MINUTES / 60} hours.
+                  </p>
+                )}
+                {availabilityCheckDate && availabilityCheckSlot && slotHasMatchDuration && (
+                  <div className="availability-check-results" role="status">
+                    {!suggestionTeam ? (
+                      <p className="availability-check-note">Select your player/team first.</p>
+                    ) : (
+                      <>
+                        <p className="availability-check-note">
+                          {availableTeamsForSlot.length > 0
+                            ? `${availableTeamsForSlot.length} team${availableTeamsForSlot.length === 1 ? '' : 's'} available in this slot.`
+                            : 'No pending teams are fully available in this slot yet.'}
+                        </p>
+                        {availableTeamsForSlot.length > 0 && (
+                          <div className="availability-team-list">
+                            {availableTeamsForSlot.map((teamId) => (
+                              <span
+                                className="availability-team availability-team--ready"
+                                key={teamId}
+                              >
+                                {teamDisplay(scheduleGroup, teamId)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {unavailableTeamsForSlot.length > 0 && (
+                          <div className="availability-team-list">
+                            {unavailableTeamsForSlot.map((teamId) => (
+                              <span
+                                className="availability-team availability-team--not-ready"
+                                key={teamId}
+                              >
+                                {teamDisplay(scheduleGroup, teamId)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+
+              <div className="suggestion-step">
+                <h3>Rest between matches</h3>
+                <div className="suggestion-fields">
+                  <label className="field">
+                    Minimum days before and after your matches
+                    <select value={yourGapDays} onChange={(e) => onYourGap(Number(e.target.value))}>
+                      {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                        <option value={days} key={days}>
+                          {days} day{days === 1 ? '' : 's'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="field">
+                    Minimum days before and after opponent matches
+                    <select
+                      value={opponentGapDays}
+                      onChange={(e) => onOpponentGap(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                        <option value={days} key={days}>
+                          {days} day{days === 1 ? '' : 's'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </details>
 
             <button className="suggest-button" onClick={onFind}>
               Find available matches
