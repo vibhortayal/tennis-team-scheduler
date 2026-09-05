@@ -370,15 +370,11 @@ function PickerSection({
         date,
         modeLabel,
         timeWindows,
-        onRemove: () => {
-          slots.forEach((slot) => {
-            onDeleteSlot(slot.id);
-          });
+        onRemove: async () => {
+          await Promise.all(slots.map((slot) => onDeleteSlot(slot.id)));
         },
-        onEdit: () => {
-          slots.forEach((slot) => {
-            onDeleteSlot(slot.id);
-          });
+        onEdit: async () => {
+          await Promise.all(slots.map((slot) => onDeleteSlot(slot.id)));
           setPendingDates((current) =>
             current.includes(date) ? current : [...current, date].sort()
           );

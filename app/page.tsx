@@ -829,19 +829,23 @@ export default function Page() {
         ...playerKeysForTeam(scheduleGroup, suggestionTeam),
         ...playerKeysForTeam(scheduleGroup, opponentId),
       ];
-      const windows = intersectTimeWindows(
-        participants
-          .filter((player) =>
-            (slotMap.get(player) || []).some((s) => (s.kind ?? 'available') === 'available')
-          )
-          .map((player) => effectiveWindowsForPlayer(slotMap.get(player) || []))
+      const playersWithAvailability = participants.filter((player) =>
+        (slotMap.get(player) || []).some((slot) => (slot.kind ?? 'available') === 'available')
       );
+      const windows =
+        playersWithAvailability.length === 0
+          ? []
+          : intersectTimeWindows(
+              playersWithAvailability.map((player) =>
+                effectiveWindowsForPlayer(slotMap.get(player) || [])
+              )
+            );
       const participantNames = scheduleRoster
         .find(([id]) => id === suggestionTeam)?.[1]
         .split(',')
         .concat(scheduleRoster.find(([id]) => id === opponentId)?.[1].split(',') || [])
         .map((name) => name.trim());
-      const playersWithAvailability = participants.filter(
+      const playersWithAvailabilityCount = participants.filter(
         (player) => (slotMap.get(player) || []).length
       ).length;
       const missingPlayers = participants
@@ -920,7 +924,7 @@ export default function Page() {
           alternateCount: Math.max(0, starts.length - 1),
           missingPlayers,
           allPlayersReady: missingPlayers.length === 0,
-          playersWithAvailability,
+          playersWithAvailability: playersWithAvailabilityCount,
           totalPlayers: participants.length,
           yourPreviousGame: yourContexts.previous,
           yourNextGame: yourContexts.next,
