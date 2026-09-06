@@ -104,12 +104,6 @@ export function StandingsTable({
 
                   <td className="standings-players-cell">{row.players}</td>
 
-                  <td className="standings-num">{row.matchesPlayed}</td>
-
-                  <td className="standings-num">{row.matchesWon}</td>
-
-                  <td className="standings-num">{row.matchesLost}</td>
-
                   <td className="standings-num standings-pts">{row.totalPoints}</td>
 
                   <td
@@ -123,6 +117,12 @@ export function StandingsTable({
                   >
                     {nsr(row.netScoreRate)}
                   </td>
+
+                  <td className="standings-num">{row.matchesPlayed}</td>
+
+                  <td className="standings-num">{row.matchesWon}</td>
+
+                  <td className="standings-num">{row.matchesLost}</td>
 
                   <td className="standings-num">{row.gamesWon}</td>
 
