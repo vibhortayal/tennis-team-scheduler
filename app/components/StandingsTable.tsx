@@ -38,6 +38,12 @@ export function StandingsTable({
               <th scope="col" className="standings-players">
                 Players
               </th>
+              <th scope="col" title="Standing points">
+                Pts
+              </th>
+              <th scope="col" title="Net Score Rate">
+                Net SR
+              </th>
               <th scope="col" title="Matches played">
                 Played
               </th>
@@ -46,12 +52,6 @@ export function StandingsTable({
               </th>
               <th scope="col" title="Matches lost">
                 Lost
-              </th>
-              <th scope="col" title="Standing points">
-                Pts
-              </th>
-              <th scope="col" title="Net Score Rate">
-                Net SR
               </th>
               <th scope="col" title="Games won">
                 GW
