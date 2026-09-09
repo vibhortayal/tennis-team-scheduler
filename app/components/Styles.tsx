@@ -101,17 +101,6 @@ export function Styles() {
       .info-inline{padding:8px 10px;border-radius:10px;background:#f1f7f1}
       .info-inline p{margin:0 0 4px;color:#47614d !important;font-size:12px;font-weight:400;line-height:1.4}
       .info-inline p:last-child{margin:0}
-      /* === My Matches (personalized, identity-scoped) panel === */
-      .my-matches{margin:20px 0;padding:18px;border:2px solid #bfe3c6;border-radius:16px;background:linear-gradient(120deg,#ffffff,#edf8ef)}
-      .my-matches-heading{margin:2px 0 4px}
-      .my-matches-sub{margin:0 0 4px;color:#5f7064;font-size:13px}
-      .my-matches-empty{margin:12px 0 0;color:#5f7064}
-      .my-matches-group{margin-top:18px;padding-top:14px;border-top:1px solid #cbdccd}
-      .my-matches-group:first-of-type{margin-top:12px}
-      .my-matches-group-title{margin:0 0 10px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#47614d}
-      .my-matches-chip{display:inline-block;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#b7791f;color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px}
-      .my-matches-overdue-card{border:2px solid #e3b34e;background:#fffdf4}
-      .my-matches-overdue-card button{background:#b7791f}
       .suggestions-panel{margin:6px 0 24px;padding:20px;border:1px solid #cbdccd;border-radius:16px;background:linear-gradient(120deg,#ffffff,#edf8ef)}
       .suggestions-panel h2{margin:5px 0 8px}
       .suggestions-panel p{color:#5f7064}
@@ -417,7 +406,6 @@ export function Styles() {
         .hero{display:block}
         .badge{display:inline-block;margin-top:12px}
         .filters select{flex-basis:100%;width:100%}
-        .my-matches{padding:14px}
         .modal{padding:0}
         .modal-card{width:100%;height:100%;max-height:none;border-radius:0;padding:20px}
         .modal-card .actions{position:sticky;bottom:-20px;padding:12px 0 0;background:#fff}

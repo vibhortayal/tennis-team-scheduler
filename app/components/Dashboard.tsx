@@ -1,7 +1,6 @@
 import { Group, Identity, Team, groups, teamDisplay } from '../teams';
 import { Match, dateText, currentDateInFremont, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
-import { MyMatchesPanel } from './MyMatchesPanel';
 
 type DashboardProps = {
   matches: Match[];
@@ -48,8 +47,13 @@ export function Dashboard({
       (!team || teamIds(match, group).includes(team))
   );
   const today = currentDateInFremont();
+  // Featured card is tournament-wide: today's or the next scheduled match,
+  // regardless of group tab or team-dropdown selection.
+  const tournamentUpcoming = matches.filter(
+    (match) => match.status === 'Scheduled' && match.match_date >= today
+  );
   const featuredMatch =
-    filteredUpcoming.find((match) => match.match_date === today) || filteredUpcoming[0];
+    tournamentUpcoming.find((match) => match.match_date === today) || tournamentUpcoming[0];
   const showNextMatches = filter === 'All' || filter === 'Scheduled';
 
   return (
@@ -93,8 +97,6 @@ export function Dashboard({
           <div className="badge">UPCOMING</div>
         </section>
       )}
-
-      <MyMatchesPanel matches={matches} identity={identity} onEdit={onEdit} />
 
       <div className="tabs">
         {(['Group A', 'Group B'] as Group[]).map((nextGroup) => (
