@@ -544,7 +544,7 @@ export default function Page() {
     loadAvailability(nextIdentity);
 
     if (!nextIdentity.viewing) {
-      setView('scheduling');
+      setView('dashboard');
       setGroup(nextIdentity.group);
       setScheduleGroup(nextIdentity.group);
       setStandingsGroup(nextIdentity.group);
