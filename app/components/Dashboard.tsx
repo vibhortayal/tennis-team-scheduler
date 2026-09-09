@@ -1,9 +1,11 @@
 import { Group, Identity, Team, groups, teamDisplay } from '../teams';
-import { Match, dateText, currentDateInFremont, teamIds } from '../lib/matches';
+import { Match, dateText, canUpdateMatch, currentDateInFremont, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
+import { shouldShowActionRequired } from '../lib/teamScope';
 
 type DashboardProps = {
   matches: Match[];
+  overdue: Match[];
   upcoming: Match[];
   completed: Match[];
   cancelled: Match[];
@@ -23,6 +25,7 @@ type DashboardProps = {
 
 export function Dashboard({
   matches,
+  overdue,
   upcoming,
   completed,
   cancelled,
@@ -41,7 +44,11 @@ export function Dashboard({
 }: DashboardProps) {
   const currentRoster = roster || groups[group];
   const currentRosters = rosters || groups;
-  const filteredUpcoming = upcoming.filter(
+  const showActionRequired = shouldShowActionRequired(identity, team, overdue.length);
+  // Past-due matches stay visible as Scheduled for everyone else; they get the
+  // urgent treatment only when the signed-in user views their own team.
+  const upcomingWithOverdue = showActionRequired ? upcoming : [...overdue, ...upcoming];
+  const filteredUpcoming = upcomingWithOverdue.filter(
     (match) =>
       (filter === 'All' || match.status === filter) &&
       (!team || teamIds(match, group).includes(team))
@@ -153,6 +160,61 @@ export function Dashboard({
           </button>
         )}
       </div>
+
+      {showActionRequired && (
+        <section className="overdue-section">
+          <h2 className="overdue-heading">
+            Action required — {overdue.length} past match
+            {overdue.length === 1 ? '' : 'es'}
+          </h2>
+
+          <p className="overdue-copy">
+            These scheduled match times have passed in Fremont. Update each match as completed with
+            a result, or cancel it with a reason.
+          </p>
+
+          <div className="grid">
+            {overdue.map((match) => {
+              const canUpdate = canUpdateMatch(match, identity);
+
+              return (
+                <article className="card overdue-card" key={match.id}>
+                  <div className="overdue-badge">UPDATE REQUIRED</div>
+
+                  <small>
+                    {dateText(match.match_date)} · {match.match_time.slice(0, 5)} · <b>Scheduled</b>
+                  </small>
+
+                  <Matchup match={match} group={group} />
+
+                  <p>{match.court}</p>
+
+                  <button
+                    onClick={() => onEdit(match)}
+                    disabled={!canUpdate}
+                    title={
+                      canUpdate
+                        ? 'Update match details'
+                        : 'Only players on this match can update it'
+                    }
+                    aria-label={
+                      canUpdate
+                        ? 'Update match details'
+                        : 'Only players on this match can update it'
+                    }
+                  >
+                    Update match details
+                  </button>
+
+                  {!canUpdate && (
+                    <p className="permission-note">Only players on this match can update it.</p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <Section
         title="Upcoming matches"

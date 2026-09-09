@@ -20,6 +20,7 @@ import {
   Draft,
   Suggestion,
   blank,
+  fremontNow,
   matchDateTime,
   currentDateInFremont,
   teamIds,
@@ -734,17 +735,19 @@ export default function Page() {
     );
   }, [suggestions, suggestionOpponent]);
 
+  const nowInFremont = fremontNow();
   const todayInFremont = currentDateInFremont();
 
-  const { upcoming, completed, cancelled } = useMemo(() => {
+  const { overdue, upcoming, completed, cancelled } = useMemo(() => {
     const scheduled = scoped.filter((match) => match.status === 'Scheduled');
 
     return {
+      overdue: scheduled.filter((match) => matchDateTime(match) < nowInFremont),
       upcoming: scheduled.filter((match) => match.match_date >= todayInFremont),
       completed: scoped.filter((match) => match.status === 'Completed'),
       cancelled: scoped.filter((match) => match.status === 'Cancelled'),
     };
-  }, [scoped, todayInFremont]);
+  }, [nowInFremont, scoped, todayInFremont]);
 
   const begin = (match?: Match) => {
     if (match && !canUpdateMatch(match, identity)) {
@@ -1163,6 +1166,7 @@ export default function Page() {
       {view === 'dashboard' ? (
         <Dashboard
           matches={matches}
+          overdue={overdue}
           upcoming={upcoming}
           completed={completed}
           cancelled={cancelled}

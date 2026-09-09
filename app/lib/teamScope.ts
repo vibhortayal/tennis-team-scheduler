@@ -9,3 +9,19 @@ export function defaultTeamForGroupTab(identity: Identity, group: Group): string
   if (identity.viewing) return '';
   return identity.group === group ? identity.teamId : '';
 }
+
+/**
+ * Whether the dashboard shows the "Action required" section for past-due
+ * scheduled matches. Only when a signed-in (non-viewing) user has their own
+ * team selected in the team dropdown and that team has overdue matches.
+ * Everyone else sees those matches as regular Scheduled entries.
+ */
+export function shouldShowActionRequired(
+  identity: Identity,
+  team: string,
+  overdueCount: number
+): boolean {
+  return (
+    !identity.viewing && identity.teamId !== '' && team === identity.teamId && overdueCount > 0
+  );
+}
