@@ -1163,6 +1163,7 @@ export default function Page() {
           standingsGroup={standingsGroup}
           onGroupChange={setStandingsGroup}
           selectedTeamId={identity.viewing ? null : identity.teamId}
+          matches={matches}
         />
       ) : (
         <SmartScheduling
