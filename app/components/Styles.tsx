@@ -355,6 +355,47 @@ export function Styles() {
       }
       .permission-note{font-size:12px;color:#758278;margin:4px 0 0}
 
+      /* === Standings team button + team match history dialog === */
+      .standings-team-btn{
+        display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+        background:none;border:none;padding:2px 4px;margin:-2px -4px;
+        font:inherit;color:inherit;text-align:left;cursor:pointer;border-radius:6px;
+      }
+      .standings-team-btn:hover .team-number,
+      .standings-team-btn:hover .standings-team-players{color:#147a42;text-decoration:underline}
+      .standings-team-btn:focus-visible{outline:2px solid #147a42;outline-offset:2px}
+      .team-history-modal{width:min(620px,100%)}
+      .team-history-sub{margin-top:-8px}
+      .team-history-modal section{margin-top:18px}
+      .team-history-modal h3{margin:0 0 8px;font-size:15px;color:#17663d}
+      .team-history-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+      .team-history-match{
+        display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+        padding:10px 12px;background:#f8fbf7;border:1px solid #d6dfd5;border-radius:10px;
+      }
+      .team-history-main{display:grid;gap:2px;min-width:0}
+      .team-history-date{font-weight:700;font-size:13px;color:#15231a}
+      .team-history-vs{font-size:13px;color:#15231a;overflow-wrap:anywhere}
+      .team-history-score,.team-history-details{font-size:12px;color:#5f7064}
+      .team-history-score{font-weight:700;color:#15231a}
+      .team-history-badges{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+      .team-history-outcome{
+        display:inline-block;padding:2px 8px;border-radius:999px;
+        font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;
+      }
+      .team-history-outcome--win{background:#147a42;color:#fff}
+      .team-history-outcome--loss{background:#a72c11;color:#fff}
+      .team-history-outcome--neutral{background:#e8ede7;color:#47614d}
+      .team-history-status{
+        display:inline-block;padding:2px 8px;border-radius:999px;
+        font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;
+        background:#e8ede7;color:#47614d;
+      }
+      .team-history-excluded{
+        font-size:11px;color:#8a6d1a;background:#fdf3d7;border:1px solid #ecd28a;
+        padding:1px 8px;border-radius:999px;white-space:nowrap;
+      }
+
       @media(max-width:650px){
         main{padding:14px}
         .top{display:grid;grid-template-columns:1fr;gap:14px}
