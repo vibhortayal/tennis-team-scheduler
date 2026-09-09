@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Group,
   Identity,
@@ -20,7 +20,6 @@ import {
   Draft,
   Suggestion,
   blank,
-  fremontNow,
   matchDateTime,
   currentDateInFremont,
   teamIds,
@@ -70,6 +69,10 @@ export default function Page() {
   const [manageTeamsOpen, setManageTeamsOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const [team, setTeam] = useState('');
+  // Pending identity-driven team default. Applied by login/restore and preserved
+  // across a group-tab switch triggered by the same login; cleared on manual change.
+  const identityTeamDefaultRef = useRef<string | null>(null);
+  const prevGroupRef = useRef<Group>(group);
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
   const [draft, setDraft] = useState<Draft>(blank('Group A'));
@@ -498,6 +501,11 @@ export default function Page() {
       setIdentity(savedIdentity);
       loadAvailability(savedIdentity);
 
+      // Default the team-scope dropdown to the restored identity's team.
+      const restoredTeam = savedIdentity.viewing ? '' : savedIdentity.teamId;
+      identityTeamDefaultRef.current = restoredTeam;
+      setTeam(restoredTeam);
+
       if (savedIdentity.viewing) {
         setGroup('Group A');
         setScheduleGroup('Group A');
@@ -523,6 +531,11 @@ export default function Page() {
     setIdentity(nextIdentity);
     window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
 
+    // Default the team-scope dropdown to the new identity's team.
+    const defaultTeam = nextIdentity.viewing ? '' : nextIdentity.teamId;
+    identityTeamDefaultRef.current = defaultTeam;
+    setTeam(defaultTeam);
+
     setSuggestions([]);
     setSuggestionNote('');
     setSuggestionOpponent('');
@@ -541,6 +554,13 @@ export default function Page() {
       setStandingsGroup('Group A');
       setSuggestionTeam('');
     }
+  };
+
+  const handleTeamChange = (value: string) => {
+    // A manual dropdown choice overrides the identity default until the
+    // identity changes or the group tab switches.
+    identityTeamDefaultRef.current = null;
+    setTeam(value);
   };
 
   const saveSlot = async (input: SlotSaveInput, id?: string) => {
@@ -595,7 +615,18 @@ export default function Page() {
   };
 
   useEffect(() => {
-    setTeam('');
+    const groupChanged = prevGroupRef.current !== group;
+    prevGroupRef.current = group;
+
+    if (identityTeamDefaultRef.current !== null) {
+      // Preserve an identity-driven default applied by login/restore when the
+      // group tab switched as part of the same update.
+      setTeam(identityTeamDefaultRef.current);
+      identityTeamDefaultRef.current = null;
+    } else if (groupChanged) {
+      // Existing group-tab behavior: reset the team scope when the tab changes.
+      setTeam('');
+    }
 
     if (!open) {
       const gRoster = activeRosters[group];
@@ -701,19 +732,17 @@ export default function Page() {
     );
   }, [suggestions, suggestionOpponent]);
 
-  const nowInFremont = fremontNow();
   const todayInFremont = currentDateInFremont();
 
-  const { overdue, upcoming, completed, cancelled } = useMemo(() => {
+  const { upcoming, completed, cancelled } = useMemo(() => {
     const scheduled = scoped.filter((match) => match.status === 'Scheduled');
 
     return {
-      overdue: scheduled.filter((match) => matchDateTime(match) < nowInFremont),
       upcoming: scheduled.filter((match) => match.match_date >= todayInFremont),
       completed: scoped.filter((match) => match.status === 'Completed'),
       cancelled: scoped.filter((match) => match.status === 'Cancelled'),
     };
-  }, [nowInFremont, scoped, todayInFremont]);
+  }, [scoped, todayInFremont]);
 
   const begin = (match?: Match) => {
     if (match && !canUpdateMatch(match, identity)) {
@@ -1131,7 +1160,7 @@ export default function Page() {
 
       {view === 'dashboard' ? (
         <Dashboard
-          overdue={overdue}
+          matches={matches}
           upcoming={upcoming}
           completed={completed}
           cancelled={cancelled}
@@ -1143,7 +1172,7 @@ export default function Page() {
           rosters={activeRosters}
           onGroupChange={setGroup}
           onFilterChange={setFilter}
-          onTeamChange={setTeam}
+          onTeamChange={handleTeamChange}
           onEdit={begin}
           onAddTeam={
             !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'

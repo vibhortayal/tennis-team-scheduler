@@ -1,9 +1,10 @@
 import { Group, Identity, Team, groups, teamDisplay } from '../teams';
-import { Match, dateText, canUpdateMatch, currentDateInFremont, teamIds } from '../lib/matches';
+import { Match, dateText, currentDateInFremont, teamIds } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
+import { MyMatchesPanel } from './MyMatchesPanel';
 
 type DashboardProps = {
-  overdue: Match[];
+  matches: Match[];
   upcoming: Match[];
   completed: Match[];
   cancelled: Match[];
@@ -22,7 +23,7 @@ type DashboardProps = {
 };
 
 export function Dashboard({
-  overdue,
+  matches,
   upcoming,
   completed,
   cancelled,
@@ -93,6 +94,8 @@ export function Dashboard({
         </section>
       )}
 
+      <MyMatchesPanel matches={matches} identity={identity} onEdit={onEdit} />
+
       <div className="tabs">
         {(['Group A', 'Group B'] as Group[]).map((nextGroup) => (
           <button
@@ -148,61 +151,6 @@ export function Dashboard({
           </button>
         )}
       </div>
-
-      {overdue.length > 0 && (
-        <section className="overdue-section">
-          <h2 className="overdue-heading">
-            Action required — {overdue.length} past match
-            {overdue.length === 1 ? '' : 'es'}
-          </h2>
-
-          <p className="overdue-copy">
-            These scheduled match times have passed in Fremont. Update each match as completed with
-            a result, or cancel it with a reason.
-          </p>
-
-          <div className="grid">
-            {overdue.map((match) => {
-              const canUpdate = canUpdateMatch(match, identity);
-
-              return (
-                <article className="card overdue-card" key={match.id}>
-                  <div className="overdue-badge">UPDATE REQUIRED</div>
-
-                  <small>
-                    {dateText(match.match_date)} · {match.match_time.slice(0, 5)} · <b>Scheduled</b>
-                  </small>
-
-                  <Matchup match={match} group={group} />
-
-                  <p>{match.court}</p>
-
-                  <button
-                    onClick={() => onEdit(match)}
-                    disabled={!canUpdate}
-                    title={
-                      canUpdate
-                        ? 'Update match details'
-                        : 'Only players on this match can update it'
-                    }
-                    aria-label={
-                      canUpdate
-                        ? 'Update match details'
-                        : 'Only players on this match can update it'
-                    }
-                  >
-                    Update match details
-                  </button>
-
-                  {!canUpdate && (
-                    <p className="permission-note">Only players on this match can update it.</p>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       <Section
         title="Upcoming matches"
