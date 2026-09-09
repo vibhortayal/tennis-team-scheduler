@@ -43,6 +43,7 @@ import {
   rankMatchSuggestions,
 } from './lib/scheduling';
 import { SlotSaveInput } from './components/AvailabilityManager';
+import { defaultTeamForGroupTab } from './lib/teamScope';
 import { computeStandings, ScoreEntryState, validateScores } from './lib/scoring';
 import { normalizeDate } from './lib/availabilityHelpers';
 import { Dashboard } from './components/Dashboard';
@@ -624,8 +625,9 @@ export default function Page() {
       setTeam(identityTeamDefaultRef.current);
       identityTeamDefaultRef.current = null;
     } else if (groupChanged) {
-      // Existing group-tab behavior: reset the team scope when the tab changes.
-      setTeam('');
+      // Returning to the identity's own group tab reselects the identity's
+      // team; any other group tab resets the scope to all teams.
+      setTeam(defaultTeamForGroupTab(identity, group));
     }
 
     if (!open) {
@@ -636,7 +638,7 @@ export default function Page() {
       }
       setDraft(blank(group));
     }
-  }, [group, open, activeRosters]);
+  }, [group, identity, open, activeRosters]);
 
   const scoped = useMemo(
     () =>
