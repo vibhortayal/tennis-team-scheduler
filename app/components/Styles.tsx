@@ -101,6 +101,13 @@ export function Styles() {
       .info-inline{padding:8px 10px;border-radius:10px;background:#f1f7f1}
       .info-inline p{margin:0 0 4px;color:#47614d !important;font-size:12px;font-weight:400;line-height:1.4}
       .info-inline p:last-child{margin:0}
+      .overdue-section{margin:20px 0;padding:18px;border:2px solid #d94924;border-radius:16px;background:#fff3ed}
+      .overdue-heading{margin:0 0 6px;color:#a72c11}
+      .overdue-copy{margin:0 0 16px;color:#8c351f}
+      .overdue-card{border:2px solid #ef7d58;background:#fffaf7;box-shadow:0 4px 14px rgba(167,44,17,.14)}
+      .overdue-card small{color:#a72c11}
+      .overdue-card button{background:#c63d1c}
+      .overdue-badge{display:inline-block;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#c63d1c;color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px}
       .suggestions-panel{margin:6px 0 24px;padding:20px;border:1px solid #cbdccd;border-radius:16px;background:linear-gradient(120deg,#ffffff,#edf8ef)}
       .suggestions-panel h2{margin:5px 0 8px}
       .suggestions-panel p{color:#5f7064}
