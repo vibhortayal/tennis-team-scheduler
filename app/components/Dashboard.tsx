@@ -1,5 +1,12 @@
 import { Group, Identity, Team, groups, teamDisplay } from '../teams';
-import { Match, dateText, canUpdateMatch, currentDateInFremont, teamIds } from '../lib/matches';
+import {
+  Match,
+  dateText,
+  canUpdateMatch,
+  currentDateInFremont,
+  featuredDayMatches,
+  teamIds,
+} from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
 import { shouldShowActionRequired } from '../lib/teamScope';
 
@@ -54,28 +61,25 @@ export function Dashboard({
       (!team || teamIds(match, group).includes(team))
   );
   const today = currentDateInFremont();
-  // Featured card is tournament-wide: today's or the next scheduled match,
-  // regardless of group tab or team-dropdown selection.
-  const tournamentUpcoming = matches.filter(
-    (match) => match.status === 'Scheduled' && match.match_date >= today
-  );
-  const featuredMatch =
-    tournamentUpcoming.find((match) => match.match_date === today) || tournamentUpcoming[0];
+  // Featured card is tournament-wide: every scheduled match on the featured
+  // day (today, or the date of the next scheduled match), regardless of group
+  // tab or team-dropdown selection.
+  const featuredMatches = featuredDayMatches(matches, today);
+  const featuredDate = featuredMatches[0]?.match_date ?? null;
   const showNextMatches = filter === 'All' || filter === 'Scheduled';
 
   return (
     <>
-      {showNextMatches && featuredMatch ? (
+      {showNextMatches && featuredDate ? (
         <section className="hero next-matches">
           <div className="wide-hero">
             <div className="eyebrow">
-              {featuredMatch.match_date === today ? "TODAY'S MATCH" : 'NEXT MATCH'} ·{' '}
-              {dateText(featuredMatch.match_date)}
+              {featuredDate === today ? "TODAY'S MATCH" : 'NEXT MATCH'}
+              {featuredMatches.length === 1 ? '' : 'ES'} · {dateText(featuredDate)}
             </div>
 
             <div className="grid">
-              {(() => {
-                const match = featuredMatch;
+              {featuredMatches.map((match) => {
                 const matchGroup = (match.league_group || 'Group B') as Group;
 
                 return (
@@ -89,7 +93,7 @@ export function Dashboard({
                     <p>{match.court}</p>
                   </article>
                 );
-              })()}
+              })}
             </div>
           </div>
         </section>
