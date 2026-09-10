@@ -197,3 +197,17 @@ export const restGapAroundDate = (teamMatches: Match[], date: string) => {
   const nextGap = nextMatch ? daysBetween(date, nextMatch.match_date) : 99;
   return Math.min(previousGap, nextGap);
 };
+
+// Every scheduled match on the hero card's featured day: today when any
+// scheduled match is today, otherwise the date of the next scheduled match.
+// The day's matches come back sorted by time.
+export const featuredDayMatches = (allMatches: Match[], today: string): Match[] => {
+  const upcoming = allMatches
+    .filter((match) => match.status === 'Scheduled' && match.match_date >= today)
+    .sort(
+      (a, b) => a.match_date.localeCompare(b.match_date) || a.match_time.localeCompare(b.match_time)
+    );
+  const featuredDate =
+    upcoming.find((match) => match.match_date === today)?.match_date ?? upcoming[0]?.match_date;
+  return featuredDate ? upcoming.filter((match) => match.match_date === featuredDate) : [];
+};
