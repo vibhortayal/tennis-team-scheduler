@@ -19,6 +19,9 @@ export function Styles() {
       .next-matches{display:block}
       .wide-hero{width:100%}
       .wide-hero .eyebrow{margin-bottom:12px}
+      .hero-toggle{display:flex;gap:8px;margin:0 0 12px}
+      .hero-toggle button{background:#eaf4eb;color:#17663d;min-height:36px;padding:6px 12px;font-size:13px}
+      .hero-toggle button.active{background:#17231d;color:#fff}
       .header-actions{display:flex;align-items:center;gap:8px;justify-self:center}
       .top .group-schedule{display:block;margin:0}
       .add-team-btn{background:#17663d;color:#fff;display:inline-flex;align-items:center;gap:4px}

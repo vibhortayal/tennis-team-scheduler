@@ -198,6 +198,15 @@ export const restGapAroundDate = (teamMatches: Match[], date: string) => {
   return Math.min(previousGap, nextGap);
 };
 
+// Scheduled-match pool for the hero card's "My matches" scope: matches in the
+// identity's group that involve the identity's team.
+export const matchesForIdentityTeam = (allMatches: Match[], identity: Identity): Match[] =>
+  allMatches.filter(
+    (match) =>
+      (match.league_group || 'Group B') === identity.group &&
+      matchIncludesTeam(match.matchup, identity.teamId)
+  );
+
 // Every scheduled match on the hero card's featured day: today when any
 // scheduled match is today, otherwise the date of the next scheduled match.
 // The day's matches come back sorted by time.

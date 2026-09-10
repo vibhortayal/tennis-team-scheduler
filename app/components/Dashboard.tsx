@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Group, Identity, Team, groups, teamDisplay } from '../teams';
 import {
   Match,
@@ -5,6 +6,7 @@ import {
   canUpdateMatch,
   currentDateInFremont,
   featuredDayMatches,
+  matchesForIdentityTeam,
   teamIds,
 } from '../lib/matches';
 import { Matchup, Section } from './MatchCard';
@@ -61,12 +63,41 @@ export function Dashboard({
       (!team || teamIds(match, group).includes(team))
   );
   const today = currentDateInFremont();
-  // Featured card is tournament-wide: every scheduled match on the featured
-  // day (today, or the date of the next scheduled match), regardless of group
-  // tab or team-dropdown selection.
-  const featuredMatches = featuredDayMatches(matches, today);
+  // Hero scope toggle: "All matches" is tournament-wide; "My matches" shows
+  // the signed-in identity's team. Only offered when signed in with a team.
+  const [heroScope, setHeroScope] = useState<'all' | 'mine'>('all');
+  const canShowMyMatches = !identity.viewing && identity.teamId !== '';
+  const heroPool =
+    heroScope === 'mine' && canShowMyMatches ? matchesForIdentityTeam(matches, identity) : matches;
+  // Featured card shows every scheduled match on the featured day (today, or
+  // the date of the next scheduled match), regardless of group tab or
+  // team-dropdown selection.
+  const featuredMatches = featuredDayMatches(heroPool, today);
   const featuredDate = featuredMatches[0]?.match_date ?? null;
   const showNextMatches = filter === 'All' || filter === 'Scheduled';
+  const plural = featuredMatches.length === 1 ? '' : 'ES';
+  const eyebrowLabel =
+    heroScope === 'mine'
+      ? `MY MATCH${plural}`
+      : `${featuredDate === today ? "TODAY'S MATCH" : 'NEXT MATCH'}${plural}`;
+  const heroToggle = canShowMyMatches ? (
+    <div className="hero-toggle" role="group" aria-label="Choose which matches to feature">
+      <button
+        type="button"
+        className={heroScope === 'all' ? 'active' : ''}
+        onClick={() => setHeroScope('all')}
+      >
+        All matches
+      </button>
+      <button
+        type="button"
+        className={heroScope === 'mine' ? 'active' : ''}
+        onClick={() => setHeroScope('mine')}
+      >
+        My matches
+      </button>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -74,9 +105,10 @@ export function Dashboard({
         <section className="hero next-matches">
           <div className="wide-hero">
             <div className="eyebrow">
-              {featuredDate === today ? "TODAY'S MATCH" : 'NEXT MATCH'}
-              {featuredMatches.length === 1 ? '' : 'ES'} · {dateText(featuredDate)}
+              {eyebrowLabel} · {dateText(featuredDate)}
             </div>
+
+            {heroToggle}
 
             <div className="grid">
               {featuredMatches.map((match) => {
@@ -100,9 +132,21 @@ export function Dashboard({
       ) : (
         <section className="hero">
           <div>
-            <div className="eyebrow">NEXT MATCH</div>
-            <h1>No upcoming matches scheduled.</h1>
-            <p>Schedule the next match to get started.</p>
+            <div className="eyebrow">{heroScope === 'mine' ? 'MY MATCHES' : 'NEXT MATCH'}</div>
+
+            {heroToggle}
+
+            <h1>
+              {heroScope === 'mine'
+                ? 'No upcoming matches for your team.'
+                : 'No upcoming matches scheduled.'}
+            </h1>
+
+            <p>
+              {heroScope === 'mine'
+                ? 'Check back after the next round is scheduled.'
+                : 'Schedule the next match to get started.'}
+            </p>
           </div>
 
           <div className="badge">UPCOMING</div>
