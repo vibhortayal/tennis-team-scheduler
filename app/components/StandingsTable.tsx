@@ -160,6 +160,7 @@ export function StandingsView({
   onGroupChange,
   selectedTeamId,
   matches,
+  isFinal,
 }: {
   standingsA: TeamStandingRow[];
   standingsB: TeamStandingRow[];
@@ -167,6 +168,8 @@ export function StandingsView({
   onGroupChange: (g: Group) => void;
   selectedTeamId?: string | null;
   matches: Match[];
+  /** The group stage is over: standings are frozen, top 4 qualified. */
+  isFinal?: boolean;
 }) {
   const rows = standingsGroup === 'Group A' ? standingsA : standingsB;
   const [historyTeamId, setHistoryTeamId] = useState<string | null>(null);
@@ -191,6 +194,12 @@ export function StandingsView({
 
   return (
     <>
+      {isFinal && (
+        <p className="phase-banner" role="status">
+          Final standings — the group stage is complete and the top 4 from each group qualified for
+          the knockout bracket.
+        </p>
+      )}
       <div className="tabs">
         {(['Group A', 'Group B'] as Group[]).map((g) => (
           <button

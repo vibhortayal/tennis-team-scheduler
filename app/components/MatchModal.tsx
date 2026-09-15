@@ -1,6 +1,7 @@
 import { FormEvent, useState, useEffect } from 'react';
 import { Group, Team, allPlayers, identityValue, teamDisplay, teamNames } from '../teams';
 import { Draft } from '../lib/matches';
+import { matchStage } from '../lib/knockout';
 import { ScoreEntryState, blankScoreEntry, scoreEntryFromResult } from '../lib/scoring';
 import { ScoreEntry } from './ScoreEntry';
 
@@ -66,7 +67,13 @@ type MatchModalProps = {
   onDraft: (d: Draft) => void;
   onClose: () => void;
   onSubmit: (e: FormEvent, scores: ScoreEntryState) => void;
+  /** Knockout fixtures: teams are fixed by the bracket (players can't change them). */
+  lockTeams?: boolean;
+  /** The tournament admin can create arbitrary pairings and adjust stage/slot. */
+  isAdmin?: boolean;
 };
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export function MatchModal({
   group,
@@ -81,6 +88,8 @@ export function MatchModal({
   onDraft,
   onClose,
   onSubmit,
+  lockTeams,
+  isAdmin,
 }: MatchModalProps) {
   const [scoreEntry, setScoreEntry] = useState<ScoreEntryState>(blankScoreEntry());
   const [scoreError, setScoreError] = useState('');
@@ -120,13 +129,16 @@ export function MatchModal({
     <div className="modal">
       <form onSubmit={handleSubmit} className="modal-card">
         <h2>
-          {editing ? 'Update' : 'Schedule'} {group} match
+          {editing ? 'Update' : 'Schedule'}{' '}
+          {matchStage(draft) === 'group'
+            ? `${group} match`
+            : `${capitalize(matchStage(draft))} match`}
         </h2>
         {note && <p className="notice">{note}</p>}
         <div className="fields">
           <label className="field">
             First team
-            <select value={first} onChange={(e) => onFirst(e.target.value)}>
+            <select value={first} onChange={(e) => onFirst(e.target.value)} disabled={lockTeams}>
               {roster
                 .filter(([id]) => id !== second)
                 .map(([id]) => (
@@ -138,7 +150,7 @@ export function MatchModal({
           </label>
           <label className="field">
             Opponent
-            <select value={second} onChange={(e) => onSecond(e.target.value)}>
+            <select value={second} onChange={(e) => onSecond(e.target.value)} disabled={lockTeams}>
               {roster
                 .filter(([id]) => id !== first)
                 .map(([id]) => (
@@ -179,6 +191,46 @@ export function MatchModal({
               ))}
             </select>
           </label>
+
+          {isAdmin && (
+            <>
+              <label className="field">
+                Stage
+                <select
+                  value={draft.stage || 'group'}
+                  onChange={(e) =>
+                    onDraft({
+                      ...draft,
+                      stage: e.target.value,
+                      knockout_slot: e.target.value === 'group' ? null : draft.knockout_slot,
+                    })
+                  }
+                >
+                  <option value="group">Group</option>
+                  <option value="quarterfinal">Quarterfinal</option>
+                  <option value="semifinal">Semifinal</option>
+                  <option value="final">Final</option>
+                </select>
+              </label>
+
+              {draft.stage && draft.stage !== 'group' && (
+                <label className="field">
+                  Bracket slot
+                  <select
+                    value={draft.knockout_slot || ''}
+                    onChange={(e) => onDraft({ ...draft, knockout_slot: e.target.value || null })}
+                  >
+                    <option value="">—</option>
+                    {['QF1', 'QF2', 'QF3', 'QF4', 'SF1', 'SF2', 'F'].map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </>
+          )}
 
           {draft.status === 'Completed' && (
             <ScoreEntry

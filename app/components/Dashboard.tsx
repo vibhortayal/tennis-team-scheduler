@@ -9,7 +9,10 @@ import {
   matchesForIdentityTeam,
   teamIds,
 } from '../lib/matches';
+import { nextKnockoutFixture, matchStage, type Phase } from '../lib/knockout';
+import { TeamStandingRow } from '../lib/scoring';
 import { Matchup, Section } from './MatchCard';
+import { BracketView } from './Bracket';
 import { shouldShowActionRequired } from '../lib/teamScope';
 
 type DashboardProps = {
@@ -30,6 +33,13 @@ type DashboardProps = {
   onEdit: (match: Match) => void;
   onAddTeam?: () => void;
   onManageTeams?: () => void;
+  /** Current tournament phase; drives the knockout hero and bracket. */
+  phase: Phase;
+  /** All knockout-stage matches (used for the next-fixture hero). */
+  knockoutMatches: Match[];
+  /** Frozen group standings, for the eliminated-team hero rank line. */
+  standingsA: TeamStandingRow[];
+  standingsB: TeamStandingRow[];
 };
 
 export function Dashboard({
@@ -50,6 +60,10 @@ export function Dashboard({
   onEdit,
   onAddTeam,
   onManageTeams,
+  phase,
+  knockoutMatches,
+  standingsA,
+  standingsB,
 }: DashboardProps) {
   const currentRoster = roster || groups[group];
   const currentRosters = rosters || groups;
@@ -99,9 +113,74 @@ export function Dashboard({
     </div>
   ) : null;
 
+  // Knockout-phase hero for signed-in players: their next fixture if they are
+  // still alive, otherwise an eliminated/spectator message with their final
+  // group rank. Admins and viewers keep the tournament-wide hero.
+  const isKnockoutPlayer =
+    phase !== 'group' && !identity.viewing && !identity.admin && identity.teamId !== '';
+  const knockoutNext = isKnockoutPlayer
+    ? nextKnockoutFixture(knockoutMatches, identity.teamId)
+    : null;
+  const finalRank =
+    isKnockoutPlayer && !knockoutNext
+      ? [
+          { group: 'Group A' as Group, rows: standingsA },
+          { group: 'Group B' as Group, rows: standingsB },
+        ]
+          .map(({ group: g, rows }) => {
+            const row = rows.find((r) => r.teamId === identity.teamId);
+            return row ? { group: g, rank: row.groupRank } : null;
+          })
+          .find(Boolean)
+      : null;
+
   return (
     <>
-      {showNextMatches && featuredDate ? (
+      {knockoutNext ? (
+        <section className="hero next-matches">
+          <div className="wide-hero">
+            <div className="eyebrow">YOUR {matchStage(knockoutNext).toUpperCase()}</div>
+
+            <div className="grid">
+              <article className="card" key={knockoutNext.id}>
+                <small>
+                  KNOCKOUT ·{' '}
+                  {knockoutNext.match_date
+                    ? `${dateText(knockoutNext.match_date)} · ${knockoutNext.match_time.slice(0, 5)}`
+                    : 'Date TBD'}
+                </small>
+
+                <Matchup match={knockoutNext} group={identity.group} />
+
+                <p>
+                  {knockoutNext.court || 'Court TBD'} · <b>{knockoutNext.status}</b>
+                </p>
+
+                {canUpdateMatch(knockoutNext, identity) && (
+                  <button type="button" onClick={() => onEdit(knockoutNext)}>
+                    {knockoutNext.match_date ? 'Update match' : 'Schedule match'}
+                  </button>
+                )}
+              </article>
+            </div>
+          </div>
+        </section>
+      ) : isKnockoutPlayer ? (
+        <section className="hero">
+          <div>
+            <div className="eyebrow">TOURNAMENT</div>
+
+            <h1>Your tournament has ended.</h1>
+
+            <p>
+              {finalRank ? `You finished #${finalRank.rank} in ${finalRank.group}. ` : ''}
+              Follow the knockout bracket below.
+            </p>
+          </div>
+
+          <div className="badge">SPECTATOR</div>
+        </section>
+      ) : showNextMatches && featuredDate ? (
         <section className="hero next-matches">
           <div className="wide-hero">
             <div className="eyebrow">
@@ -151,6 +230,10 @@ export function Dashboard({
 
           <div className="badge">UPCOMING</div>
         </section>
+      )}
+
+      {phase !== 'group' && (
+        <BracketView matches={knockoutMatches} identity={identity} onEdit={onEdit} />
       )}
 
       <div className="tabs">

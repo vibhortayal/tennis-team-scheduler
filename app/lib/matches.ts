@@ -22,6 +22,10 @@ export type Match = {
   league_group?: Group;
   excluded_from_standings?: boolean;
   standings_override?: StandingsOverride | null;
+  /** Tournament stage: 'group' (default) or a knockout round. */
+  stage?: string | null;
+  /** Knockout bracket slot: QF1..QF4, SF1, SF2, F. Null for group matches. */
+  knockout_slot?: string | null;
 };
 
 export type Draft = Omit<Match, 'id'>;

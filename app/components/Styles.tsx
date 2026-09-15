@@ -98,6 +98,13 @@ export function Styles() {
       .team-line.winner .team-names{color:#147a42;font-weight:800}
 .team-line.winner .team-number{background:#147a42;color:#fff}
 .winner-badge{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;padding:2px 8px;border-radius:999px;background:#147a42;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.bracket{margin:24px 0}
+.bracket-round{margin:18px 0}
+.bracket-round h3{margin:0 0 10px}
+.bracket-slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.bracket-stage-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#1f5fa8;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.champion-banner{margin:12px 0;padding:14px 16px;border-radius:12px;background:linear-gradient(120deg,#fff8e6,#ffefc2);border:2px solid #d9a521;font-size:17px;font-weight:800;color:#7a5410}
+.phase-banner{margin:12px 0;padding:10px 14px;border-radius:12px;background:#eaf1fb;border:1px solid #b9cdea;font-size:14px;font-weight:700;color:#1f5fa8}
       .matchup{display:grid;gap:8px;margin:12px 0}
       .versus{color:#758278;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
       .team-with-info{display:grid;gap:6px;min-width:0}
