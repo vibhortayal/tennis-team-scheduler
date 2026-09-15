@@ -98,6 +98,7 @@ export function Styles() {
       .team-line.winner .team-names{color:#147a42;font-weight:800}
 .team-line.winner .team-number{background:#147a42;color:#fff}
 .winner-badge{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;padding:2px 8px;border-radius:999px;background:#147a42;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.update-needed-badge{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;padding:2px 8px;border-radius:999px;background:#b45309;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
 .bracket{margin:24px 0}
 .bracket-round{margin:18px 0}
 .bracket-round h3{margin:0 0 10px}

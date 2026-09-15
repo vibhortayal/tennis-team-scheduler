@@ -1,7 +1,13 @@
 import type { Identity } from '../teams';
 import { teamDisplay } from '../teams';
 import type { Match } from '../lib/matches';
-import { canUpdateMatch, dateText, teamIds } from '../lib/matches';
+import {
+  canUpdateMatch,
+  dateText,
+  teamIds,
+  isMatchOverdue,
+  currentDateInFremont,
+} from '../lib/matches';
 import {
   buildBracket,
   nextKnockoutFixture,
@@ -65,6 +71,9 @@ function SlotCard({
             {match.match_date ? dateText(match.match_date) : 'Date TBD'}
             {match.match_date ? ` · ${match.match_time.slice(0, 5)}` : ''} ·{' '}
             {match.court || 'Court TBD'} · <b>{match.status}</b>
+            {isMatchOverdue(match, currentDateInFremont()) && canUpdate && (
+              <span className="update-needed-badge">Update needed</span>
+            )}
           </p>
           {match.result && (
             <p>

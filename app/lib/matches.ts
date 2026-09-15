@@ -115,6 +115,16 @@ export const compareMatchDateTimeDesc = (a: Match, b: Match): number =>
 
 export const currentDateInFremont = () => fremontNow().slice(0, 10);
 
+/**
+ * A scheduled match whose date has passed without a result is overdue:
+ * someone needs to enter the score or reschedule it. Undated fixtures
+ * (knockout TBD) are never overdue. Shown to every identity.
+ */
+export const isMatchOverdue = (match: Match, today: string): boolean =>
+  match.status.toLowerCase() === 'scheduled' &&
+  Boolean(match.match_date) &&
+  (match.match_date as string) < today;
+
 const dayValue = (date: string) => new Date(`${date}T12:00:00`).getTime();
 
 export const daysBetween = (from: string, to: string) =>

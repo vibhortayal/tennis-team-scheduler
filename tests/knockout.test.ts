@@ -297,3 +297,48 @@ test('nextKnockoutFixture tolerates seeded quarterfinals with null dates', () =>
   assert.equal(next?.knockout_slot, 'QF1');
   assert.equal(nextKnockoutFixture(matches, '99'), null);
 });
+
+test('isMatchOverdue flags scheduled matches past their date', async () => {
+  const { isMatchOverdue } = await import('../app/lib/matches.ts');
+  const base = {
+    id: 'm1',
+    matchup: 'Team #1 vs Team #2',
+    match_time: '18:00',
+    court: 'Court 1',
+    result: null,
+  } as const;
+  const today = '2026-09-15';
+  assert.equal(
+    isMatchOverdue({ ...base, status: 'Scheduled', match_date: '2026-09-14' }, today),
+    true,
+    'yesterday scheduled -> overdue'
+  );
+  assert.equal(
+    isMatchOverdue({ ...base, status: 'Scheduled', match_date: '2026-09-15' }, today),
+    false,
+    'today scheduled -> not overdue'
+  );
+  assert.equal(
+    isMatchOverdue({ ...base, status: 'Scheduled', match_date: '2026-09-16' }, today),
+    false,
+    'tomorrow scheduled -> not overdue'
+  );
+  assert.equal(
+    isMatchOverdue(
+      { ...base, status: 'Completed', match_date: '2026-09-14', result: '6-4 6-4' },
+      today
+    ),
+    false,
+    'completed -> not overdue'
+  );
+  assert.equal(
+    isMatchOverdue({ ...base, status: 'Cancelled', match_date: '2026-09-14' }, today),
+    false,
+    'cancelled -> not overdue'
+  );
+  assert.equal(
+    isMatchOverdue({ ...base, status: 'Scheduled', match_date: '' }, today),
+    false,
+    'undated (knockout TBD) -> not overdue'
+  );
+});

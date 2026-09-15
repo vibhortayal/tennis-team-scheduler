@@ -8,6 +8,7 @@ import {
   teamIds,
   matchesForTeam,
   currentDateInFremont,
+  isMatchOverdue,
 } from '../lib/matches';
 import { matchWinner } from '../lib/scoring';
 
@@ -102,6 +103,7 @@ export function Section({
   group: Group;
   selectedIdentity?: Identity | null;
 }) {
+  const today = currentDateInFremont();
   return (
     <section>
       <h2>{title}</h2>
@@ -114,6 +116,9 @@ export function Section({
                 <small>
                   {dateText(m.match_date)} · {m.match_time ? m.match_time.slice(0, 5) : 'Time TBD'}{' '}
                   · <b>{m.status}</b>
+                  {isMatchOverdue(m, today) && canUpdate && (
+                    <span className="update-needed-badge">Update needed</span>
+                  )}
                 </small>
                 <Matchup match={m} group={group} />
                 <p>{m.court}</p>
