@@ -1,7 +1,7 @@
 import type { Group } from '../teams';
 import { teamDisplay } from '../teams';
 import type { Match } from './matches';
-import { teamIds } from './matches';
+import { teamIds, compareMatchDateTimeAsc } from './matches';
 import type { TeamStandingRow } from './scoring';
 import { applyStandingsOverride, matchWinner } from './scoring';
 
@@ -331,9 +331,7 @@ export function nextKnockoutFixture(matches: Match[], teamId: string): Match | n
       const ids = teamIds(m, 'Group A');
       return ids.includes(teamId) && knockoutWinnerId(m) === null;
     })
-    .sort(
-      (a, b) => a.match_date.localeCompare(b.match_date) || a.match_time.localeCompare(b.match_time)
-    );
+    .sort(compareMatchDateTimeAsc);
   return upcoming[0] ?? null;
 }
 

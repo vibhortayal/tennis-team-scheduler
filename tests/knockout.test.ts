@@ -260,3 +260,40 @@ test('hasDecidedDownstream blocks editing a feeder once downstream is decided', 
   assert.equal(hasDecidedDownstream([qf, sf], 'F'), false);
   assert.equal(hasDecidedDownstream([qf, sf], null), false);
 });
+
+// ------------------------------------------------- null-date regression
+
+test('compareMatchDateTimeAsc/Desc tolerate null dates and sort them last', async () => {
+  const { compareMatchDateTimeAsc, compareMatchDateTimeDesc } =
+    await import('../app/lib/matches.ts');
+  const undated = koMatch({
+    match_date: null as unknown as string,
+    match_time: null as unknown as string,
+  });
+  const dated = koMatch({ match_date: '2026-10-05', match_time: '10:00' });
+  const earlier = koMatch({ match_date: '2026-10-01', match_time: '09:00' });
+
+  // no throw, undated sorts last in both directions
+  const asc = [undated, dated, earlier].sort(compareMatchDateTimeAsc);
+  assert.equal(asc[0].match_date, '2026-10-01');
+  assert.equal(asc[2].match_date, null);
+  const desc = [undated, earlier, dated].sort(compareMatchDateTimeDesc);
+  assert.equal(desc[0].match_date, '2026-10-05');
+  assert.equal(desc[2].match_date, null);
+});
+
+test('nextKnockoutFixture tolerates seeded quarterfinals with null dates', () => {
+  // seedQuarterfinals POST bodies omit match_date/match_time; the DB returns null.
+  const undated = (slot: string, matchup: string) =>
+    koMatch({
+      knockout_slot: slot as 'QF1',
+      matchup,
+      match_date: null as unknown as string,
+      match_time: null as unknown as string,
+      status: 'unscheduled',
+    });
+  const matches = [undated('QF1', 'Team #5 vs Team #13'), undated('QF2', 'Team #12 vs Team #10')];
+  const next = nextKnockoutFixture(matches, '5');
+  assert.equal(next?.knockout_slot, 'QF1');
+  assert.equal(nextKnockoutFixture(matches, '99'), null);
+});

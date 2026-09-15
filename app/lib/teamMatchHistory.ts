@@ -7,7 +7,13 @@
  */
 
 import { Group } from '../teams';
-import { Match, matchIncludesTeam, teamIds } from './matches';
+import {
+  Match,
+  compareMatchDateTimeAsc,
+  compareMatchDateTimeDesc,
+  matchIncludesTeam,
+  teamIds,
+} from './matches';
 import { matchWinner } from './scoring';
 
 // ---------------------------------------------------------------------------
@@ -97,11 +103,9 @@ export function outcomeForTeam(match: Match, teamId: string, group: Group): Team
   return (winner === 'a') === isTeamA ? 'win' : 'loss';
 }
 
-const byDateDesc = (a: Match, b: Match) =>
-  b.match_date.localeCompare(a.match_date) || b.match_time.localeCompare(a.match_time);
+const byDateDesc = (a: Match, b: Match) => compareMatchDateTimeDesc(a, b);
 
-const byDateAsc = (a: Match, b: Match) =>
-  a.match_date.localeCompare(b.match_date) || a.match_time.localeCompare(b.match_time);
+const byDateAsc = (a: Match, b: Match) => compareMatchDateTimeAsc(a, b);
 
 /**
  * Split a team's matches into completed (finalized statuses, newest first)

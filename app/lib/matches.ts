@@ -66,12 +66,15 @@ export const blank = (g: Group): Draft => ({
   league_group: g,
 });
 
-export const dateText = (d: string) =>
-  new Intl.DateTimeFormat('en-US', {
+/** Knockout fixtures are created without a date; never throw on a missing one. */
+export const dateText = (d: string | null | undefined) => {
+  if (!d) return 'Date TBD';
+  return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   }).format(new Date(`${d}T12:00:00`));
+};
 
 export const fremontNow = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -87,7 +90,28 @@ export const fremontNow = () => {
   return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
 };
 
-export const matchDateTime = (m: Match) => `${m.match_date}T${m.match_time.slice(0, 5)}`;
+export const matchDateTime = (m: Match) =>
+  `${m.match_date || ''}T${(m.match_time || '').slice(0, 5)}`;
+
+/**
+ * Null-safe match ordering. Knockout fixtures are created without a date
+ * (status 'unscheduled'), and the database returns those columns as null —
+ * a bare `match_date.localeCompare` throws and takes down the whole page.
+ * Undated matches sort last.
+ */
+const sortableDate = (d: string | null | undefined): string => d || '';
+const sortableTime = (t: string | null | undefined): string => t || '';
+const dateRank = (d: string | null | undefined): number => (d ? 0 : 1);
+
+export const compareMatchDateTimeAsc = (a: Match, b: Match): number =>
+  dateRank(a.match_date) - dateRank(b.match_date) ||
+  sortableDate(a.match_date).localeCompare(sortableDate(b.match_date)) ||
+  sortableTime(a.match_time).localeCompare(sortableTime(b.match_time));
+
+export const compareMatchDateTimeDesc = (a: Match, b: Match): number =>
+  dateRank(a.match_date) - dateRank(b.match_date) ||
+  sortableDate(b.match_date).localeCompare(sortableDate(a.match_date)) ||
+  sortableTime(b.match_time).localeCompare(sortableTime(a.match_time));
 
 export const currentDateInFremont = () => fremontNow().slice(0, 10);
 

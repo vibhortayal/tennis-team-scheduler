@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Group } from '../teams';
-import { Match, dateText, teamIds } from '../lib/matches';
+import { Match, compareMatchDateTimeAsc, dateText, teamIds } from '../lib/matches';
 import { groupStageBlockers, type Phase } from '../lib/knockout';
 import { teamDisplay } from '../teams';
 
@@ -47,9 +47,7 @@ export function ManageTab({
 
   const visible = matches
     .filter((match) => statusFilter === 'All' || match.status === statusFilter)
-    .sort(
-      (a, b) => a.match_date.localeCompare(b.match_date) || a.match_time.localeCompare(b.match_time)
-    );
+    .sort(compareMatchDateTimeAsc);
 
   const blockers = groupStageBlockers(matches);
 
@@ -181,7 +179,7 @@ export function ManageTab({
                 <div className="manage-team-row" key={match.id}>
                   <span>
                     {match.match_date ? dateText(match.match_date) : 'Unscheduled'} ·{' '}
-                    {match.match_time.slice(0, 5)} ·{' '}
+                    {match.match_time ? `${match.match_time.slice(0, 5)} · ` : ''}
                     {ids.length === 2
                       ? `${teamDisplay(matchGroup, ids[0])} vs ${teamDisplay(matchGroup, ids[1])}`
                       : match.matchup}{' '}
