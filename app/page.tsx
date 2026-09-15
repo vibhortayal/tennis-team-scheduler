@@ -1504,12 +1504,18 @@ export default function Page() {
           Standings
         </button>
 
-        <button
-          className={view === 'scheduling' ? 'active' : ''}
-          onClick={() => setView('scheduling')}
-        >
-          Smart Scheduling
-        </button>
+        {/* Smart Scheduling is a player tool in the group phase (personal
+            availability + matchup suggestions); the admin has no team, so
+            hide it for admin until the knockout phase, where this tab
+            becomes the bracket scheduling panel. */}
+        {(!isAdmin || phase !== 'group') && (
+          <button
+            className={view === 'scheduling' ? 'active' : ''}
+            onClick={() => setView('scheduling')}
+          >
+            Smart Scheduling
+          </button>
+        )}
 
         {isAdmin && (
           <button className={view === 'manage' ? 'active' : ''} onClick={() => setView('manage')}>
