@@ -4,10 +4,14 @@ export function PlayerPicker({
   identity,
   onChange,
   players,
+  adminConfigured,
+  onAdminSelect,
 }: {
   identity: Identity;
   onChange: (next: Identity) => void;
   players?: Identity[];
+  adminConfigured?: boolean;
+  onAdminSelect?: () => void;
 }) {
   const playerList = players || allPlayers;
   const sortedPlayers = [...playerList].sort((a, b) => a.name.localeCompare(b.name));
@@ -25,6 +29,10 @@ export function PlayerPicker({
             onChange(viewingIdentity);
             return;
           }
+          if (value === 'admin') {
+            onAdminSelect?.();
+            return;
+          }
           const selected = playerList.find((player) => identityValue(player) === value);
           if (selected) onChange(selected);
         }}
@@ -35,6 +43,7 @@ export function PlayerPicker({
             {player.name}
           </option>
         ))}
+        {adminConfigured && <option value="admin">🔒 Tournament Admin</option>}
       </select>
     </label>
   );

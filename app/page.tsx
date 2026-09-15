@@ -9,6 +9,7 @@ import {
   IDENTITY_KEY,
   allPlayers,
   viewingIdentity,
+  adminIdentity,
   identityValue,
   TeamRecord,
   initialStaticTeams,
@@ -57,8 +58,11 @@ import { DateParticipantStatus } from './components/MultiDateCalendar';
 import { AddTeamModal } from './components/AddTeamModal';
 import { ManageTeamsModal, WithdrawalResolution } from './components/ManageTeamsModal';
 import { getActiveRoster, NewTeamInput, validateNewTeam } from './lib/teamValidation';
+import { isAdminConfigured, isAdminSession, setAdminSession, clearAdminSession } from './lib/admin';
+import { AdminLogin } from './components/AdminLogin';
+import { ManageTab } from './components/ManageTab';
 
-type View = 'dashboard' | 'scheduling' | 'standings';
+type View = 'dashboard' | 'scheduling' | 'standings' | 'manage';
 
 export default function Page() {
   const [view, setView] = useState<View>('dashboard');
@@ -91,6 +95,8 @@ export default function Page() {
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
   const [availabilityOpponents, setAvailabilityOpponents] = useState<string[]>([]);
   const [identity, setIdentity] = useState<Identity>(viewingIdentity);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const isAdmin = identity.admin === true;
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [allAvailability, setAllAvailability] = useState<AvailabilitySlot[]>([]);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
@@ -431,7 +437,7 @@ export default function Page() {
   }, [loadTeams]);
 
   const loadAvailability = useCallback(async (player: Identity) => {
-    if (player.viewing || !availabilityApi || !key) {
+    if (player.viewing || player.admin || !availabilityApi || !key) {
       setAvailability([]);
       setAllAvailability([]);
       return;
@@ -479,6 +485,13 @@ export default function Page() {
 
   useEffect(() => {
     try {
+      // An admin session survives reloads via sessionStorage; it is never
+      // written to localStorage alongside player identities.
+      if (isAdminSession() && isAdminConfigured()) {
+        setIdentity(adminIdentity);
+        return;
+      }
+
       const saved = window.localStorage.getItem(IDENTITY_KEY);
 
       if (!saved) {
@@ -531,7 +544,22 @@ export default function Page() {
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
+
+    // The admin identity is session-scoped only: never persisted to
+    // localStorage, no player availability, and it keeps the current view.
+    if (nextIdentity.admin) {
+      setAdminLoginOpen(false);
+      setNote('Tournament admin unlocked. Switch identity to return to a player view.');
+      return;
+    }
+
+    clearAdminSession();
     window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+
+    // Leaving the admin role drops out of the management UI.
+    if (view === 'manage') {
+      setView('dashboard');
+    }
 
     // Default the team-scope dropdown to the new identity's team.
     const defaultTeam = nextIdentity.viewing ? '' : nextIdentity.teamId;
@@ -558,6 +586,19 @@ export default function Page() {
     }
   };
 
+  const openAdminLogin = () => {
+    setAdminLoginOpen(true);
+  };
+
+  const cancelAdminLogin = () => {
+    setAdminLoginOpen(false);
+  };
+
+  const confirmAdminLogin = () => {
+    setAdminSession();
+    chooseIdentity(adminIdentity);
+  };
+
   const handleTeamChange = (value: string) => {
     // A manual dropdown choice overrides the identity default until the
     // identity changes or the group tab switches.
@@ -566,7 +607,7 @@ export default function Page() {
   };
 
   const saveSlot = async (input: SlotSaveInput, id?: string) => {
-    if (identity.viewing || !availabilityApi || !key) return;
+    if (identity.viewing || identity.admin || !availabilityApi || !key) return;
     setAvailabilitySaving(true);
     setAvailabilityError('');
     try {
@@ -1119,23 +1160,15 @@ export default function Page() {
           <button className="group-schedule" onClick={startScheduling}>
             Schedule match
           </button>
-          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
-            <button type="button" className="add-team-btn" onClick={() => setAddTeamOpen(true)}>
-              + Add Team
-            </button>
-          )}
-          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
-            <button
-              type="button"
-              className="manage-teams-btn"
-              onClick={() => setManageTeamsOpen(true)}
-            >
-              ⚙ Manage
-            </button>
-          )}
         </div>
 
-        <PlayerPicker identity={identity} onChange={chooseIdentity} players={activePlayers} />
+        <PlayerPicker
+          identity={identity}
+          onChange={chooseIdentity}
+          players={activePlayers}
+          adminConfigured={isAdminConfigured()}
+          onAdminSelect={openAdminLogin}
+        />
       </header>
 
       <div className="tabs">
@@ -1159,6 +1192,12 @@ export default function Page() {
         >
           Smart Scheduling
         </button>
+
+        {isAdmin && (
+          <button className={view === 'manage' ? 'active' : ''} onClick={() => setView('manage')}>
+            ⚙ Manage
+          </button>
+        )}
       </div>
 
       {note && <p className="notice">{note}</p>}
@@ -1180,16 +1219,8 @@ export default function Page() {
           onFilterChange={setFilter}
           onTeamChange={handleTeamChange}
           onEdit={begin}
-          onAddTeam={
-            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
-              ? () => setAddTeamOpen(true)
-              : undefined
-          }
-          onManageTeams={
-            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
-              ? () => setManageTeamsOpen(true)
-              : undefined
-          }
+          onAddTeam={isAdmin ? () => setAddTeamOpen(true) : undefined}
+          onManageTeams={isAdmin ? () => setManageTeamsOpen(true) : undefined}
         />
       ) : view === 'standings' ? (
         <StandingsView
@@ -1199,6 +1230,13 @@ export default function Page() {
           onGroupChange={setStandingsGroup}
           selectedTeamId={identity.viewing ? null : identity.teamId}
           matches={matches}
+        />
+      ) : view === 'manage' && isAdmin ? (
+        <ManageTab
+          matches={matches}
+          onEdit={begin}
+          onAddTeam={() => setAddTeamOpen(true)}
+          onManageTeams={() => setManageTeamsOpen(true)}
         />
       ) : (
         <SmartScheduling
@@ -1251,6 +1289,8 @@ export default function Page() {
           onContinue={continueWithIdentity}
         />
       )}
+
+      {adminLoginOpen && <AdminLogin onCancel={cancelAdminLogin} onSuccess={confirmAdminLogin} />}
 
       {open && (
         <MatchModal

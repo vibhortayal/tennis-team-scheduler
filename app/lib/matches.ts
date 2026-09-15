@@ -127,6 +127,10 @@ export const teamIds = (m: Match, g: Group, roster?: readonly Team[]) => {
 };
 
 export const canUpdateMatch = (match: Match, identity: Identity) => {
+  // The tournament admin can update any match (corrections, scheduling,
+  // knockout management). Players stay scoped to their own matches.
+  if (identity.admin) return true;
+
   const matchGroup = (match.league_group || 'Group B') as Group;
 
   return (
