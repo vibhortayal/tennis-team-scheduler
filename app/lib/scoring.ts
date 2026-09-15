@@ -228,13 +228,16 @@ function gamesForTeam(result: string, isTeamA: boolean): { won: number; lost: nu
   return { won, lost };
 }
 
-export function getEffectiveStandingsMatch(match: Match): Match | null {
-  if (match.excluded_from_standings || match.status === 'voided') {
-    return null;
-  }
-
-  if (match.standings_override?.reason === 'team_withdrawal') {
-    // Return a dummy match with the walkover score so the rest of the logic sees a 6-0, 6-0 win for the opponent
+/**
+ * Applies a standings override (walkover) to a match, rewriting it as a
+ * 6-0, 6-0 win for the awarded winner. Does not consider exclusion flags;
+ * use getEffectiveStandingsMatch for standings computation.
+ */
+export function applyStandingsOverride(match: Match): Match {
+  if (match.standings_override?.winnerTeamId && match.standings_override?.loserTeamId) {
+    // Return a dummy match with the walkover score so the rest of the logic sees a 6-0, 6-0 win
+    // for the winner. Applies to withdrawal walkovers ('team_withdrawal') and
+    // admin-awarded straggler walkovers ('walkover').
     const { winnerTeamId, loserTeamId, score } = match.standings_override;
     return {
       ...match,
@@ -247,6 +250,14 @@ export function getEffectiveStandingsMatch(match: Match): Match | null {
   return match;
 }
 
+export function getEffectiveStandingsMatch(match: Match): Match | null {
+  if (match.excluded_from_standings || match.status === 'voided') {
+    return null;
+  }
+
+  return applyStandingsOverride(match);
+}
+
 export function computeStandings(
   allMatches: Match[],
   group: Group,
@@ -257,7 +268,14 @@ export function computeStandings(
   const total = Math.max(0, activeTeamsCount - 1);
 
   const effectiveMatches = allMatches
-    .filter((m) => (m.league_group || 'Group B') === group && m.status === 'Completed')
+    .filter(
+      (m) =>
+        // Knockout fixtures never count toward group standings, even if the
+        // excluded flag was missed (belt and suspenders with the save path).
+        (m.stage || 'group') === 'group' &&
+        (m.league_group || 'Group B') === group &&
+        m.status === 'Completed'
+    )
     .map(getEffectiveStandingsMatch)
     .filter(
       (m): m is Match => m !== null && !!m.result?.trim() && parseResultString(m.result) !== null

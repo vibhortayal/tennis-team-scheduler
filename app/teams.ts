@@ -18,6 +18,8 @@ export type Identity = {
   teamId: string;
   group: Group;
   viewing?: boolean;
+  /** Tournament admin: password-gated management role, not a player. */
+  admin?: boolean;
 };
 
 export const initialStaticTeams: readonly TeamRecord[] = [
@@ -200,8 +202,17 @@ export const viewingIdentity: Identity = {
   viewing: true,
 };
 
-export const identityValue = (identity: Identity) =>
-  identity.viewing ? 'viewing' : `${identity.group}:${identity.teamId}:${identity.name}`;
+export const adminIdentity: Identity = {
+  name: 'Tournament Admin',
+  teamId: '',
+  group: 'Group B',
+  admin: true,
+};
+
+export const identityValue = (identity: Identity) => {
+  if (identity.admin) return 'admin';
+  return identity.viewing ? 'viewing' : `${identity.group}:${identity.teamId}:${identity.name}`;
+};
 
 export const teamDisplay = (
   g: Group,

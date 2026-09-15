@@ -22,6 +22,10 @@ export type Match = {
   league_group?: Group;
   excluded_from_standings?: boolean;
   standings_override?: StandingsOverride | null;
+  /** Tournament stage: 'group' (default) or a knockout round. */
+  stage?: string | null;
+  /** Knockout bracket slot: QF1..QF4, SF1, SF2, F. Null for group matches. */
+  knockout_slot?: string | null;
 };
 
 export type Draft = Omit<Match, 'id'>;
@@ -62,12 +66,15 @@ export const blank = (g: Group): Draft => ({
   league_group: g,
 });
 
-export const dateText = (d: string) =>
-  new Intl.DateTimeFormat('en-US', {
+/** Knockout fixtures are created without a date; never throw on a missing one. */
+export const dateText = (d: string | null | undefined) => {
+  if (!d) return 'Date TBD';
+  return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   }).format(new Date(`${d}T12:00:00`));
+};
 
 export const fremontNow = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -83,7 +90,28 @@ export const fremontNow = () => {
   return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
 };
 
-export const matchDateTime = (m: Match) => `${m.match_date}T${m.match_time.slice(0, 5)}`;
+export const matchDateTime = (m: Match) =>
+  `${m.match_date || ''}T${(m.match_time || '').slice(0, 5)}`;
+
+/**
+ * Null-safe match ordering. Knockout fixtures are created without a date
+ * (status 'unscheduled'), and the database returns those columns as null —
+ * a bare `match_date.localeCompare` throws and takes down the whole page.
+ * Undated matches sort last.
+ */
+const sortableDate = (d: string | null | undefined): string => d || '';
+const sortableTime = (t: string | null | undefined): string => t || '';
+const dateRank = (d: string | null | undefined): number => (d ? 0 : 1);
+
+export const compareMatchDateTimeAsc = (a: Match, b: Match): number =>
+  dateRank(a.match_date) - dateRank(b.match_date) ||
+  sortableDate(a.match_date).localeCompare(sortableDate(b.match_date)) ||
+  sortableTime(a.match_time).localeCompare(sortableTime(b.match_time));
+
+export const compareMatchDateTimeDesc = (a: Match, b: Match): number =>
+  dateRank(a.match_date) - dateRank(b.match_date) ||
+  sortableDate(b.match_date).localeCompare(sortableDate(a.match_date)) ||
+  sortableTime(b.match_time).localeCompare(sortableTime(a.match_time));
 
 export const currentDateInFremont = () => fremontNow().slice(0, 10);
 
@@ -127,6 +155,10 @@ export const teamIds = (m: Match, g: Group, roster?: readonly Team[]) => {
 };
 
 export const canUpdateMatch = (match: Match, identity: Identity) => {
+  // The tournament admin can update any match (corrections, scheduling,
+  // knockout management). Players stay scoped to their own matches.
+  if (identity.admin) return true;
+
   const matchGroup = (match.league_group || 'Group B') as Group;
 
   return (

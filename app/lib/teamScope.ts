@@ -6,7 +6,7 @@ import type { Group, Identity } from '../teams';
  * tab (or using a viewing-only identity) resets the scope to all teams.
  */
 export function defaultTeamForGroupTab(identity: Identity, group: Group): string {
-  if (identity.viewing) return '';
+  if (identity.viewing || identity.admin) return '';
   return identity.group === group ? identity.teamId : '';
 }
 

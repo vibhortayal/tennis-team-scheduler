@@ -9,6 +9,7 @@ import {
   IDENTITY_KEY,
   allPlayers,
   viewingIdentity,
+  adminIdentity,
   identityValue,
   TeamRecord,
   initialStaticTeams,
@@ -46,6 +47,21 @@ import {
 import { SlotSaveInput } from './components/AvailabilityManager';
 import { defaultTeamForGroupTab } from './lib/teamScope';
 import { computeStandings, ScoreEntryState, validateScores } from './lib/scoring';
+import {
+  derivePhase,
+  groupStageBlockers,
+  isKnockoutMatch,
+  matchStage,
+  nextKnockoutFixture,
+  nextRoundFixtures,
+  seedQuarterfinals,
+  canReseed,
+  hasDecidedDownstream,
+  knockoutWinnerId,
+  PHASE_LABELS,
+  type Phase,
+} from './lib/knockout';
+import { KnockoutSchedulePanel } from './components/Bracket';
 import { normalizeDate } from './lib/availabilityHelpers';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
@@ -57,8 +73,11 @@ import { DateParticipantStatus } from './components/MultiDateCalendar';
 import { AddTeamModal } from './components/AddTeamModal';
 import { ManageTeamsModal, WithdrawalResolution } from './components/ManageTeamsModal';
 import { getActiveRoster, NewTeamInput, validateNewTeam } from './lib/teamValidation';
+import { isAdminConfigured, isAdminSession, setAdminSession, clearAdminSession } from './lib/admin';
+import { AdminLogin } from './components/AdminLogin';
+import { ManageTab } from './components/ManageTab';
 
-type View = 'dashboard' | 'scheduling' | 'standings';
+type View = 'dashboard' | 'scheduling' | 'standings' | 'manage';
 
 export default function Page() {
   const [view, setView] = useState<View>('dashboard');
@@ -91,6 +110,8 @@ export default function Page() {
   const [suggestionOpponent, setSuggestionOpponent] = useState('');
   const [availabilityOpponents, setAvailabilityOpponents] = useState<string[]>([]);
   const [identity, setIdentity] = useState<Identity>(viewingIdentity);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const isAdmin = identity.admin === true;
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [allAvailability, setAllAvailability] = useState<AvailabilitySlot[]>([]);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
@@ -431,7 +452,7 @@ export default function Page() {
   }, [loadTeams]);
 
   const loadAvailability = useCallback(async (player: Identity) => {
-    if (player.viewing || !availabilityApi || !key) {
+    if (player.viewing || player.admin || !availabilityApi || !key) {
       setAvailability([]);
       setAllAvailability([]);
       return;
@@ -479,6 +500,13 @@ export default function Page() {
 
   useEffect(() => {
     try {
+      // An admin session survives reloads via sessionStorage; it is never
+      // written to localStorage alongside player identities.
+      if (isAdminSession() && isAdminConfigured()) {
+        setIdentity(adminIdentity);
+        return;
+      }
+
       const saved = window.localStorage.getItem(IDENTITY_KEY);
 
       if (!saved) {
@@ -531,7 +559,22 @@ export default function Page() {
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
+
+    // The admin identity is session-scoped only: never persisted to
+    // localStorage, no player availability, and it keeps the current view.
+    if (nextIdentity.admin) {
+      setAdminLoginOpen(false);
+      setNote('Tournament admin unlocked. Switch identity to return to a player view.');
+      return;
+    }
+
+    clearAdminSession();
     window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+
+    // Leaving the admin role drops out of the management UI.
+    if (view === 'manage') {
+      setView('dashboard');
+    }
 
     // Default the team-scope dropdown to the new identity's team.
     const defaultTeam = nextIdentity.viewing ? '' : nextIdentity.teamId;
@@ -558,6 +601,19 @@ export default function Page() {
     }
   };
 
+  const openAdminLogin = () => {
+    setAdminLoginOpen(true);
+  };
+
+  const cancelAdminLogin = () => {
+    setAdminLoginOpen(false);
+  };
+
+  const confirmAdminLogin = () => {
+    setAdminSession();
+    chooseIdentity(adminIdentity);
+  };
+
   const handleTeamChange = (value: string) => {
     // A manual dropdown choice overrides the identity default until the
     // identity changes or the group tab switches.
@@ -566,7 +622,7 @@ export default function Page() {
   };
 
   const saveSlot = async (input: SlotSaveInput, id?: string) => {
-    if (identity.viewing || !availabilityApi || !key) return;
+    if (identity.viewing || identity.admin || !availabilityApi || !key) return;
     setAvailabilitySaving(true);
     setAvailabilityError('');
     try {
@@ -645,12 +701,30 @@ export default function Page() {
     () =>
       matches.filter(
         (match) =>
+          matchStage(match) === 'group' &&
           (match.league_group || 'Group B') === group &&
           (filter === 'All' || match.status === filter) &&
           (!team || teamIds(match, group, roster).includes(team))
       ),
     [matches, group, filter, team, roster]
   );
+
+  // Tournament phase and knockout fixtures. The dashboard's group lists stay
+  // group-stage-only; knockout matches are rendered via the bracket.
+  const phase: Phase = useMemo(() => derivePhase(matches), [matches]);
+  const knockoutMatches = useMemo(() => matches.filter(isKnockoutMatch), [matches]);
+
+  // Cross-group roster for the knockout fixture editor (players are locked to
+  // the bracket pairing; the admin can adjust teams).
+  const knockoutRoster = useMemo(() => {
+    const combined: Team[] = [];
+    (['Group A', 'Group B'] as Group[]).forEach((g) => {
+      (activeRosters[g] || groups[g]).forEach((entry) => {
+        if (!combined.some(([id]) => id === entry[0])) combined.push(entry);
+      });
+    });
+    return combined;
+  }, [activeRosters]);
 
   const standingsA = useMemo(
     () => computeStandings(matches, 'Group A', activeRosterA),
@@ -755,6 +829,23 @@ export default function Page() {
       return;
     }
 
+    // Once the bracket is live, players can no longer create or touch
+    // group-stage matches; the admin can still correct them.
+    if (!identity.admin && phase !== 'group') {
+      const targetStage = match ? matchStage(match) : 'group';
+      if (targetStage === 'group') {
+        setNote('The group stage is locked — the knockout bracket is live.');
+        return;
+      }
+    }
+
+    // A feeder result that already decided a downstream fixture is bracket
+    // history: update the downstream match first, then come back here.
+    if (match && isKnockoutMatch(match) && hasDecidedDownstream(matches, match.knockout_slot)) {
+      setNote('This result already feeds a decided match — update that match first.');
+      return;
+    }
+
     setEditing(match || null);
 
     if (match) {
@@ -762,7 +853,10 @@ export default function Page() {
       const matchRoster = activeRosters[matchGroup] || groups[matchGroup];
       const ids = teamIds(match, matchGroup);
 
-      setDraft({ ...match, league_group: matchGroup });
+      // An unscheduled fixture opens in "Scheduled" mode so the player can
+      // pick a date, time, and court straight away.
+      const draftStatus = match.status === 'unscheduled' ? 'Scheduled' : match.status;
+      setDraft({ ...match, league_group: matchGroup, status: draftStatus });
       setFirst(ids[0] || matchRoster[0]?.[0] || '');
       setSecond(ids[1] || matchRoster[1]?.[0] || '');
     } else {
@@ -779,6 +873,18 @@ export default function Page() {
     if (identity.viewing) {
       setPendingIdentityValue('');
       setIdentityPromptOpen(true);
+      return;
+    }
+
+    // In the knockout phase the header button opens the player's next
+    // bracket fixture instead of a blank group-stage form.
+    if (!identity.admin && phase !== 'group' && identity.teamId) {
+      const next = nextKnockoutFixture(matches, identity.teamId);
+      if (next) {
+        begin(next);
+        return;
+      }
+      setNote('Your tournament has ended — follow the bracket below.');
       return;
     }
 
@@ -1020,12 +1126,234 @@ export default function Page() {
     setNote('');
   };
 
+  /**
+   * Creates (or refreshes) the next knockout fixtures whose feeders are
+   * decided. Undecided downstream fixtures get their pairing refreshed when
+   * a feeder result is corrected; decided downstream fixtures are history
+   * and are never touched. Returns false if any fixture write failed.
+   */
+  const syncKnockoutBracket = async (): Promise<boolean> => {
+    if (!api || !key) return false;
+    try {
+      const res = await fetch(`${api}?select=*`, { headers });
+      if (!res.ok) return false;
+      const fresh: Match[] = await res.json();
+      const fixtures = nextRoundFixtures(fresh);
+      for (const fixture of fixtures) {
+        const existing = fresh.find((m) => m.knockout_slot === fixture.slot);
+        const matchup = `Team #${fixture.firstId} vs Team #${fixture.secondId}`;
+        if (!existing) {
+          const created = await fetch(api, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              matchup,
+              status: 'unscheduled',
+              stage: fixture.stage,
+              knockout_slot: fixture.slot,
+              excluded_from_standings: true,
+            }),
+          });
+          if (!created.ok) return false;
+        } else if (knockoutWinnerId(existing) === null && existing.matchup !== matchup) {
+          const updated = await fetch(`${api}?id=eq.${existing.id}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ matchup }),
+          });
+          if (!updated.ok) return false;
+        }
+      }
+      await load();
+      return true;
+    } catch {
+      // Best-effort: the match itself was already saved.
+      return false;
+    }
+  };
+
+  /** Admin: end the group stage and create the four quarterfinal fixtures. */
+  const seedKnockouts = async () => {
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
+    const blockers = groupStageBlockers(matches);
+    if (blockers.length > 0) {
+      setNote(
+        `Resolve ${blockers.length} group match${blockers.length === 1 ? '' : 'es'} before ending the group stage.`
+      );
+      return;
+    }
+    if (derivePhase(matches) !== 'group') {
+      setNote('The knockout bracket is already live.');
+      return;
+    }
+    let seeds: ReturnType<typeof seedQuarterfinals>;
+    try {
+      seeds = seedQuarterfinals(standingsA, standingsB);
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : 'Could not seed the bracket.');
+      return;
+    }
+    for (const seed of seeds) {
+      if (matches.some((m) => m.knockout_slot === seed.slot)) continue;
+      const response = await fetch(api, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          matchup: `Team #${seed.firstId} vs Team #${seed.secondId}`,
+          status: 'unscheduled',
+          stage: seed.stage,
+          knockout_slot: seed.slot,
+          excluded_from_standings: true,
+        }),
+      });
+      if (!response.ok) {
+        setNote('Could not seed the bracket — the database may need migration 007.');
+        return;
+      }
+    }
+    await load();
+    setNote('Group stage ended. The quarterfinals are live.');
+  };
+
+  /** Admin: re-seed the quarterfinals after a standings correction. */
+  const reseedKnockouts = async () => {
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
+    if (!canReseed(matches)) {
+      setNote('Re-seeding is blocked: a quarterfinal has already been decided.');
+      return;
+    }
+    let seeds: ReturnType<typeof seedQuarterfinals>;
+    try {
+      seeds = seedQuarterfinals(standingsA, standingsB);
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : 'Could not re-seed the bracket.');
+      return;
+    }
+    for (const seed of seeds) {
+      const existing = matches.find((m) => m.knockout_slot === seed.slot);
+      const matchup = `Team #${seed.firstId} vs Team #${seed.secondId}`;
+      if (!existing) {
+        const response = await fetch(api, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            matchup,
+            status: 'unscheduled',
+            stage: seed.stage,
+            knockout_slot: seed.slot,
+            excluded_from_standings: true,
+          }),
+        });
+        if (!response.ok) {
+          setNote('Could not re-seed the bracket — the database may need migration 007.');
+          return;
+        }
+      } else if (existing.matchup !== matchup) {
+        await fetch(`${api}?id=eq.${existing.id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ matchup }),
+        });
+      }
+    }
+    await load();
+    const synced = await syncKnockoutBracket();
+    setNote(
+      synced
+        ? 'Quarterfinals re-seeded.'
+        : 'Quarterfinals re-seeded, but a bracket fixture could not be updated.'
+    );
+  };
+
+  /** Admin: resolve an unfinished group match as a walkover. */
+  const resolveStragglerWalkover = async (match: Match, winnerId: string) => {
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
+    const ids = teamIds(match, (match.league_group || 'Group B') as Group);
+    const loserId = ids.find((id) => id !== winnerId) ?? '';
+    try {
+      const response = await fetch(`${api}?id=eq.${match.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          status: 'Completed',
+          result: '6-0, 6-0',
+          standings_override: {
+            reason: 'walkover',
+            winnerTeamId: winnerId,
+            loserTeamId: loserId,
+            score: {
+              set1: { teamA: 6, teamB: 0 },
+              set2: { teamA: 6, teamB: 0 },
+            },
+          },
+        }),
+      });
+      if (!response.ok) throw new Error('walkover failed');
+    } catch {
+      setNote('Could not record the walkover.');
+      return;
+    }
+    await load();
+    setNote(`Walkover recorded for Team #${winnerId}.`);
+  };
+
+  /** Admin: void an unfinished group match so it no longer blocks the group stage. */
+  const resolveStragglerVoid = async (match: Match) => {
+    if (!api || !key) {
+      setNote('Missing Supabase public environment settings.');
+      return;
+    }
+    try {
+      const response = await fetch(`${api}?id=eq.${match.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          status: 'Cancelled',
+          cancellation_reason: 'Voided by the tournament admin',
+          excluded_from_standings: true,
+        }),
+      });
+      if (!response.ok) throw new Error('void failed');
+    } catch {
+      setNote('Could not void the match.');
+      return;
+    }
+    await load();
+    setNote('Match voided and excluded from the standings.');
+  };
+
   const save = async (event: FormEvent, scores: ScoreEntryState) => {
     event.preventDefault();
-
     if (editing && !canUpdateMatch(editing, identity)) {
       setNote('Only players on this match can update it.');
       setOpen(false);
+      return;
+    }
+
+    // Phase guards (mirror begin() so a crafted submit can't bypass them).
+    if (editing) {
+      const editingStage = matchStage(editing);
+      if (editingStage === 'group' && phase !== 'group' && !identity.admin) {
+        setNote('The group stage is locked — the knockout bracket is live.');
+        setOpen(false);
+        return;
+      }
+      if (isKnockoutMatch(editing) && hasDecidedDownstream(matches, editing.knockout_slot)) {
+        setNote('This result already feeds a decided match — update that match first.');
+        setOpen(false);
+        return;
+      }
+    } else if (!identity.admin && phase !== 'group') {
+      setNote('The group stage is locked — the knockout bracket is live.');
       return;
     }
 
@@ -1055,26 +1383,46 @@ export default function Page() {
     }
 
     const matchGroup = editing ? ((editing.league_group || 'Group B') as Group) : group;
+    const stage = (draft.stage as string) || (editing ? matchStage(editing) : 'group');
+    const isKnockout = stage !== 'group';
 
+    // The team-conflict check only applies to group-stage scheduling; a team
+    // has a single path through the knockout bracket.
     const conflict =
-      draft.status === 'Cancelled'
-        ? undefined
-        : matches.find(
+      !isKnockout && draft.status !== 'Cancelled'
+        ? matches.find(
             (match) =>
               match.id !== editing?.id &&
+              matchStage(match) === 'group' &&
               (match.league_group || 'Group B') === matchGroup &&
               match.match_date === draft.match_date &&
               match.status !== 'Cancelled' &&
               teamIds(match, matchGroup).some((id) => id === first || id === second)
-          );
+          )
+        : undefined;
 
     if (conflict) {
       setNote('One of these teams already has an active match on that date.');
       return;
     }
 
+    // A bracket slot holds at most one fixture.
+    const slot = (draft.knockout_slot as string | null) || editing?.knockout_slot || null;
+    if (
+      isKnockout &&
+      slot &&
+      matches.some((m) => m.knockout_slot === slot && m.id !== editing?.id)
+    ) {
+      setNote(`Bracket slot ${slot} already has a match.`);
+      return;
+    }
+
     const body = {
       ...draft,
+      stage,
+      knockout_slot: slot,
+      // Knockout matches never count toward group standings.
+      excluded_from_standings: isKnockout ? true : Boolean(draft.excluded_from_standings),
       league_group: matchGroup,
       matchup: `Team #${first} vs Team #${second}`,
       result,
@@ -1104,7 +1452,18 @@ export default function Page() {
     setOpen(false);
     setNote('Match saved successfully.');
     await load();
+    // A decided knockout result may unlock the next bracket fixture.
+    if (isKnockout) {
+      const synced = await syncKnockoutBracket();
+      if (!synced) {
+        setNote('Match saved, but the next bracket fixture could not be created.');
+      }
+    }
   };
+
+  // Stage of the match currently in the editor (drives team locking and the
+  // cross-group roster for knockout fixtures).
+  const modalStage = open ? matchStage(draft) : 'group';
 
   return (
     <main>
@@ -1119,23 +1478,15 @@ export default function Page() {
           <button className="group-schedule" onClick={startScheduling}>
             Schedule match
           </button>
-          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
-            <button type="button" className="add-team-btn" onClick={() => setAddTeamOpen(true)}>
-              + Add Team
-            </button>
-          )}
-          {!identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10' && (
-            <button
-              type="button"
-              className="manage-teams-btn"
-              onClick={() => setManageTeamsOpen(true)}
-            >
-              ⚙ Manage
-            </button>
-          )}
         </div>
 
-        <PlayerPicker identity={identity} onChange={chooseIdentity} players={activePlayers} />
+        <PlayerPicker
+          identity={identity}
+          onChange={chooseIdentity}
+          players={activePlayers}
+          adminConfigured={isAdminConfigured()}
+          onAdminSelect={openAdminLogin}
+        />
       </header>
 
       <div className="tabs">
@@ -1153,15 +1504,33 @@ export default function Page() {
           Standings
         </button>
 
-        <button
-          className={view === 'scheduling' ? 'active' : ''}
-          onClick={() => setView('scheduling')}
-        >
-          Smart Scheduling
-        </button>
+        {/* Smart Scheduling is a player tool in the group phase (personal
+            availability + matchup suggestions); the admin has no team, so
+            hide it for admin until the knockout phase, where this tab
+            becomes the bracket scheduling panel. */}
+        {(!isAdmin || phase !== 'group') && (
+          <button
+            className={view === 'scheduling' ? 'active' : ''}
+            onClick={() => setView('scheduling')}
+          >
+            Smart Scheduling
+          </button>
+        )}
+
+        {isAdmin && (
+          <button className={view === 'manage' ? 'active' : ''} onClick={() => setView('manage')}>
+            ⚙ Manage
+          </button>
+        )}
       </div>
 
       {note && <p className="notice">{note}</p>}
+
+      {phase !== 'group' && (
+        <p className="phase-banner" role="status">
+          🏆 {PHASE_LABELS[phase]} — group standings are frozen.
+        </p>
+      )}
 
       {view === 'dashboard' ? (
         <Dashboard
@@ -1180,16 +1549,12 @@ export default function Page() {
           onFilterChange={setFilter}
           onTeamChange={handleTeamChange}
           onEdit={begin}
-          onAddTeam={
-            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
-              ? () => setAddTeamOpen(true)
-              : undefined
-          }
-          onManageTeams={
-            !identity.viewing && identity.name === 'Vibhor' && identity.teamId === '10'
-              ? () => setManageTeamsOpen(true)
-              : undefined
-          }
+          onAddTeam={isAdmin ? () => setAddTeamOpen(true) : undefined}
+          onManageTeams={isAdmin ? () => setManageTeamsOpen(true) : undefined}
+          phase={phase}
+          knockoutMatches={knockoutMatches}
+          standingsA={standingsA}
+          standingsB={standingsB}
         />
       ) : view === 'standings' ? (
         <StandingsView
@@ -1199,6 +1564,27 @@ export default function Page() {
           onGroupChange={setStandingsGroup}
           selectedTeamId={identity.viewing ? null : identity.teamId}
           matches={matches}
+          isFinal={phase !== 'group'}
+        />
+      ) : view === 'manage' && isAdmin ? (
+        <ManageTab
+          matches={matches}
+          onEdit={begin}
+          onAddTeam={() => setAddTeamOpen(true)}
+          onManageTeams={() => setManageTeamsOpen(true)}
+          phase={phase}
+          canReseed={canReseed(matches)}
+          onSeed={seedKnockouts}
+          onReseed={reseedKnockouts}
+          onWalkover={resolveStragglerWalkover}
+          onVoid={resolveStragglerVoid}
+        />
+      ) : view === 'scheduling' && phase !== 'group' ? (
+        <KnockoutSchedulePanel
+          matches={matches}
+          identity={identity}
+          phase={phase}
+          onSchedule={begin}
         />
       ) : (
         <SmartScheduling
@@ -1252,10 +1638,12 @@ export default function Page() {
         />
       )}
 
+      {adminLoginOpen && <AdminLogin onCancel={cancelAdminLogin} onSuccess={confirmAdminLogin} />}
+
       {open && (
         <MatchModal
           group={group}
-          roster={roster}
+          roster={modalStage !== 'group' ? knockoutRoster : roster}
           editing={!!editing}
           first={first}
           second={second}
@@ -1266,6 +1654,8 @@ export default function Page() {
           onDraft={setDraft}
           onClose={() => setOpen(false)}
           onSubmit={save}
+          lockTeams={modalStage !== 'group' && !isAdmin}
+          isAdmin={isAdmin}
         />
       )}
 

@@ -2,6 +2,8 @@ import { Group, Identity, teamNames, teamDisplay } from '../teams';
 import {
   Match,
   canUpdateMatch,
+  compareMatchDateTimeAsc,
+  compareMatchDateTimeDesc,
   dateText,
   teamIds,
   matchesForTeam,
@@ -37,7 +39,7 @@ export function teamMatchLine(match: Match, group: Group, id: string) {
   if (match.status.toLowerCase() === 'completed') {
     return `${dateText(match.match_date)} vs ${vs}${match.result ? ` · ${match.result}` : ''}`;
   }
-  return `${dateText(match.match_date)} vs ${vs} · ${match.match_time.slice(0, 5)} · ${match.court}`;
+  return `${dateText(match.match_date)} vs ${vs} · ${match.match_time ? match.match_time.slice(0, 5) : 'Time TBD'} · ${match.court}`;
 }
 
 export function TeamContext({
@@ -53,14 +55,10 @@ export function TeamContext({
   const teamMatches = matchesForTeam(matches, group, id);
   const last = teamMatches
     .filter((match) => match.status.toLowerCase() === 'completed')
-    .sort(
-      (a, b) => b.match_date.localeCompare(a.match_date) || b.match_time.localeCompare(a.match_time)
-    )[0];
+    .sort(compareMatchDateTimeDesc)[0];
   const next = teamMatches
     .filter((match) => match.status.toLowerCase() === 'scheduled' && match.match_date >= today)
-    .sort(
-      (a, b) => a.match_date.localeCompare(b.match_date) || a.match_time.localeCompare(b.match_time)
-    )[0];
+    .sort(compareMatchDateTimeAsc)[0];
   return (
     <div className="team-with-info">
       <TeamLine group={group} id={id} />
@@ -114,7 +112,8 @@ export function Section({
             return (
               <article className="card" key={m.id}>
                 <small>
-                  {dateText(m.match_date)} · {m.match_time.slice(0, 5)} · <b>{m.status}</b>
+                  {dateText(m.match_date)} · {m.match_time ? m.match_time.slice(0, 5) : 'Time TBD'}{' '}
+                  · <b>{m.status}</b>
                 </small>
                 <Matchup match={m} group={group} />
                 <p>{m.court}</p>
