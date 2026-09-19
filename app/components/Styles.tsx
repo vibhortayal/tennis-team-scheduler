@@ -80,6 +80,8 @@ export function Styles() {
       }
       .modal-card h2{margin-top:0}
       .modal-card > p{color:#5f7064;line-height:1.55;margin-top:6px}
+      .khelo-note{margin:14px 0 0;padding:10px 12px;background:#f2f7ff;border:1px solid #c9dcf7;border-radius:10px;font-size:13px;line-height:1.5;color:#1e3a5f}
+      .khelo-note a{color:#1d4ed8;font-weight:700}
 
       .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
       .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
