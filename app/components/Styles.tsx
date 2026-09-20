@@ -84,6 +84,16 @@ export function Styles() {
       .khelo-note a{color:#1d4ed8;font-weight:700}
       .khelo-banner{margin:0 0 12px;padding:10px 14px;background:#f2f7ff;border:1px solid #c9dcf7;border-radius:12px;font-size:13px;line-height:1.5;color:#1e3a5f;text-align:center}
       .khelo-banner a{color:#1d4ed8;font-weight:700}
+      .khelo-promo{position:relative;text-align:center;padding:32px 28px}
+      .khelo-promo-close{position:absolute;top:12px;right:14px;border:0;background:none;font-size:16px;color:#8a9a8e;cursor:pointer;padding:6px}
+      .khelo-promo-kicker{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:999px;background:#e8f0fe;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase}
+      .khelo-promo h2{font-size:22px;line-height:1.3;margin:0 0 8px}
+      .khelo-promo-sub{color:#5f7064;line-height:1.55;margin:0 0 16px;font-size:14px}
+      .khelo-promo-features{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:10px;text-align:left}
+      .khelo-promo-features li{background:#f8fbf7;border:1px solid #d6dfd5;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.45;color:#15231a}
+      .khelo-promo-cta{display:block;background:#1d4ed8;color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:12px;text-decoration:none;margin-bottom:10px}
+      .khelo-promo-cta:hover{background:#1e40af}
+      .khelo-promo-later{border:0;background:none;color:#8a9a8e;font-size:13px;cursor:pointer;padding:6px}
 
       .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
       .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
