@@ -1489,6 +1489,20 @@ export default function Page() {
         />
       </header>
 
+      {!identity.viewing && !identity.admin && (
+        <p className="khelo-banner">
+          Innovation Tennis player?{' '}
+          <a
+            href="https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375/join"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join KheloHQ
+          </a>{' '}
+          for live scores, ratings &amp; more.
+        </p>
+      )}
+
       <div className="tabs">
         <button
           className={view === 'dashboard' ? 'active' : ''}
