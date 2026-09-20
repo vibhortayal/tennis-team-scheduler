@@ -66,6 +66,7 @@ import { normalizeDate } from './lib/availabilityHelpers';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { IdentityPrompt, MatchModal } from './components/MatchModal';
+import { KHELO_JOIN_URL, KheloPromoModal } from './components/KheloPromo';
 import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
@@ -101,6 +102,8 @@ export default function Page() {
   const [open, setOpen] = useState(false);
   const [identityPromptOpen, setIdentityPromptOpen] = useState(false);
   const [pendingIdentityValue, setPendingIdentityValue] = useState('');
+  const [kheloPromoOpen, setKheloPromoOpen] = useState(false);
+  const kheloPromoShownRef = useRef(false);
   const [note, setNote] = useState('');
   const [suggestionTeam, setSuggestionTeam] = useState('');
   const [yourGapDays, setYourGapDays] = useState(1);
@@ -556,6 +559,34 @@ export default function Page() {
       setSuggestionTeam('');
     }
   }, [loadAvailability]);
+
+  // One-time KheloHQ promo popup for signed-in players (not viewers, not admin).
+  useEffect(() => {
+    if (identity.viewing || identity.admin || kheloPromoShownRef.current) {
+      return;
+    }
+    kheloPromoShownRef.current = true;
+    let dismissed = false;
+    try {
+      dismissed = window.localStorage.getItem('khelo-promo-dismissed') === '1';
+    } catch {
+      dismissed = false;
+    }
+    if (dismissed) {
+      return;
+    }
+    const timer = window.setTimeout(() => setKheloPromoOpen(true), 1200);
+    return () => window.clearTimeout(timer);
+  }, [identity]);
+
+  const dismissKheloPromo = () => {
+    setKheloPromoOpen(false);
+    try {
+      window.localStorage.setItem('khelo-promo-dismissed', '1');
+    } catch {
+      // Storage unavailable — popup simply shows again next visit.
+    }
+  };
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
@@ -1492,11 +1523,7 @@ export default function Page() {
       {!identity.viewing && !identity.admin && (
         <p className="khelo-banner">
           Innovation Tennis player?{' '}
-          <a
-            href="https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375/join"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href={KHELO_JOIN_URL} target="_blank" rel="noopener noreferrer">
             Join KheloHQ
           </a>{' '}
           for live scores, ratings &amp; more.
@@ -1651,6 +1678,8 @@ export default function Page() {
           onContinue={continueWithIdentity}
         />
       )}
+
+      {kheloPromoOpen && <KheloPromoModal onDismiss={dismissKheloPromo} />}
 
       {adminLoginOpen && <AdminLogin onCancel={cancelAdminLogin} onSuccess={confirmAdminLogin} />}
 
