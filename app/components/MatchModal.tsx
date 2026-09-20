@@ -42,17 +42,6 @@ export function IdentityPrompt({
             ))}
           </select>
         </label>
-        <p className="khelo-note">
-          Innovation Tennis player?{' '}
-          <a
-            href="https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375/join"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Join KheloHQ
-          </a>{' '}
-          for live scores, ratings &amp; more.
-        </p>
         <div className="actions">
           <button className="secondary" type="button" onClick={onCancel}>
             Not now
