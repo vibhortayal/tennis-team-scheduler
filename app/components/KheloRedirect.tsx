@@ -10,7 +10,11 @@ import { KHELO_JOIN_URL } from './KheloPromo';
  * Behavior (owner's exact parameters):
  * - 5-second interstitial window, then full-page navigation.
  * - Signed-in player (localStorage name-pick identity, not viewing) -> KheloHQ /join.
- * - Viewer or unsure identity -> KheloHQ tournament page.
+ * - Viewer or unsure identity -> KheloHQ /join as well: the tournament page is
+ *   PRIVATE, so anonymous visitors only see a "this tournament is private"
+ *   wall. /join renders inline sign-in and preserves the join path.
+ *   (Owner's original param was viewer -> tournament page; switched 2026-09-21
+ *   per Instinct's finding. One-line revert restores it.)
  * - Admin (sessionStorage admin session) -> untouched, no interstitial at all.
  * - Escape hatch (HARD requirement): "Stay on the old site" button or ?stay=1
  *   sets localStorage 'khelo-redirect-stay=1' and the interstitial never shows again.
@@ -46,8 +50,8 @@ export function KheloRedirect() {
       // Admin: untouched.
       if (window.sessionStorage.getItem(ADMIN_SESSION_KEY) === '1') return;
 
-      // Default: viewer / unsure identity -> tournament page.
-      let dest = KHELO_TOURNAMENT_URL;
+      // Default: viewer / unsure identity -> join page (tournament page is private).
+      let dest = KHELO_JOIN_URL;
       try {
         const saved = window.localStorage.getItem(IDENTITY_KEY);
         if (saved) {
