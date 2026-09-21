@@ -1,5 +1,5 @@
 export const KHELO_JOIN_URL =
-  'https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375/join';
+  'https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375/join?code=TWC93YAS';
 
 export function KheloPromoModal({ onDismiss }: { onDismiss: () => void }) {
   return (
