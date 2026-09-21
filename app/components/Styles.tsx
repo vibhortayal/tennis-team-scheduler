@@ -84,6 +84,7 @@ export function Styles() {
       .khelo-note a{color:#1d4ed8;font-weight:700}
       .khelo-banner{margin:0 0 12px;padding:10px 14px;background:#f2f7ff;border:1px solid #c9dcf7;border-radius:12px;font-size:13px;line-height:1.5;color:#1e3a5f;text-align:center}
       .khelo-banner a{color:#1d4ed8;font-weight:700}
+      .top .khelo-banner{grid-column:1/-1;margin:0}
       .khelo-promo{position:relative;text-align:center;padding:32px 28px}
       .khelo-promo-close{position:absolute;top:12px;right:14px;border:0;background:none;font-size:16px;color:#8a9a8e;cursor:pointer;padding:6px}
       .khelo-promo-kicker{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:999px;background:#e8f0fe;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase}
