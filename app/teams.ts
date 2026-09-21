@@ -193,6 +193,26 @@ export function updateTeamRegistry(records: readonly TeamRecord[]) {
 
 export const IDENTITY_KEY = 'ito-who-am-i';
 
+/**
+ * Player sessions on the legacy scheduler expire this long after login.
+ * Mid-season policy (owner GO 2026-09-21): push players to KheloHQ, don't
+ * keep them signed in on the old app.
+ */
+export const PLAYER_SESSION_MS = 5 * 60 * 1000;
+
+/** Event fired on window whenever a player identity is chosen (logged in). */
+export const KHELO_PLAYER_LOGIN_EVENT = 'khelo:player-login';
+
+/** What actually gets persisted to localStorage: identity + login timestamp. */
+export type StoredIdentity = Identity & { loggedInAt?: number };
+
+/**
+ * A stored session is expired when it has no login timestamp (legacy rows
+ * written before expiry existed) or is older than PLAYER_SESSION_MS.
+ */
+export const isStoredSessionExpired = (stored: StoredIdentity): boolean =>
+  typeof stored.loggedInAt !== 'number' || Date.now() - stored.loggedInAt > PLAYER_SESSION_MS;
+
 export const allPlayers: Identity[] = buildPlayersList(groups);
 
 export const viewingIdentity: Identity = {

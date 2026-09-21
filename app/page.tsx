@@ -7,6 +7,10 @@ import {
   Team,
   groups,
   IDENTITY_KEY,
+  PLAYER_SESSION_MS,
+  KHELO_PLAYER_LOGIN_EVENT,
+  StoredIdentity,
+  isStoredSessionExpired,
   allPlayers,
   viewingIdentity,
   adminIdentity,
@@ -95,6 +99,44 @@ export default function Page() {
   // Pending identity-driven team default. Applied by login/restore and preserved
   // across a group-tab switch triggered by the same login; cleared on manual change.
   const identityTeamDefaultRef = useRef<string | null>(null);
+  // Mid-session expiry timer for player logins (5 min from login).
+  const sessionTimerRef = useRef<number | null>(null);
+  // Latest chooseIdentity, so the expiry timer never calls a stale closure.
+  const chooseIdentityRef = useRef<(next: Identity) => void>(() => {});
+
+  const clearSessionTimer = useCallback(() => {
+    if (sessionTimerRef.current !== null) {
+      window.clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+  }, []);
+
+  // Logs the current player out when their 5-minute session ends. Viewers get
+  // no timer; admin is session-scoped and never persisted.
+  const scheduleSessionExpiry = useCallback(
+    (loggedInAt: number) => {
+      clearSessionTimer();
+      const remaining = PLAYER_SESSION_MS - (Date.now() - loggedInAt);
+      sessionTimerRef.current = window.setTimeout(
+        () => {
+          sessionTimerRef.current = null;
+          chooseIdentityRef.current(viewingIdentity);
+        },
+        Math.max(0, remaining)
+      );
+    },
+    [clearSessionTimer]
+  );
+
+  // Drop any pending expiry timer on unmount.
+  useEffect(
+    () => () => {
+      if (sessionTimerRef.current !== null) {
+        window.clearTimeout(sessionTimerRef.current);
+      }
+    },
+    []
+  );
   const prevGroupRef = useRef<Group>(group);
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
@@ -517,7 +559,18 @@ export default function Page() {
         return;
       }
 
-      const parsed = JSON.parse(saved) as Identity;
+      const parsed = JSON.parse(saved) as StoredIdentity;
+
+      // Player sessions expire 5 min after login. Legacy rows written before
+      // the expiry existed have no timestamp and are treated as expired.
+      if (isStoredSessionExpired(parsed)) {
+        try {
+          window.localStorage.removeItem(IDENTITY_KEY);
+        } catch {
+          // Storage unavailable — identity simply isn't restored.
+        }
+        return;
+      }
 
       const savedIdentity = parsed.viewing
         ? viewingIdentity
@@ -552,6 +605,11 @@ export default function Page() {
       setScheduleGroup(savedIdentity.group);
       setStandingsGroup(savedIdentity.group);
       setSuggestionTeam(savedIdentity.teamId);
+
+      // Restored player session: expire mid-session at the 5-minute mark.
+      if (typeof parsed.loggedInAt === 'number') {
+        scheduleSessionExpiry(parsed.loggedInAt);
+      }
     } catch {
       setIdentity(viewingIdentity);
       setGroup('Group A');
@@ -559,7 +617,7 @@ export default function Page() {
       setStandingsGroup('Group A');
       setSuggestionTeam('');
     }
-  }, [loadAvailability]);
+  }, [loadAvailability, scheduleSessionExpiry]);
 
   // One-time KheloHQ promo popup for signed-in players (not viewers, not admin).
   useEffect(() => {
@@ -591,6 +649,7 @@ export default function Page() {
 
   const chooseIdentity = (nextIdentity: Identity) => {
     setIdentity(nextIdentity);
+    clearSessionTimer();
 
     // The admin identity is session-scoped only: never persisted to
     // localStorage, no player availability, and it keeps the current view.
@@ -601,7 +660,18 @@ export default function Page() {
     }
 
     clearAdminSession();
-    window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+
+    if (!nextIdentity.viewing) {
+      // Player login: timestamp the session (5-minute expiry), schedule the
+      // mid-session logout, and fire the KheloHQ interstitial.
+      const loggedInAt = Date.now();
+      const stored: StoredIdentity = { ...nextIdentity, loggedInAt };
+      window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(stored));
+      scheduleSessionExpiry(loggedInAt);
+      window.dispatchEvent(new Event(KHELO_PLAYER_LOGIN_EVENT));
+    } else {
+      window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
+    }
 
     // Leaving the admin role drops out of the management UI.
     if (view === 'manage') {
@@ -632,6 +702,11 @@ export default function Page() {
       setSuggestionTeam('');
     }
   };
+  // Keep the expiry timer pointed at the latest chooseIdentity (ref writes
+  // belong in effects, not during render).
+  useEffect(() => {
+    chooseIdentityRef.current = chooseIdentity;
+  });
 
   const openAdminLogin = () => {
     setAdminLoginOpen(true);

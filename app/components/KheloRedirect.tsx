@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { IDENTITY_KEY } from '../teams';
+import { KHELO_PLAYER_LOGIN_EVENT } from '../teams';
 import { KHELO_JOIN_URL } from './KheloPromo';
 
 /**
@@ -15,6 +15,8 @@ import { KHELO_JOIN_URL } from './KheloPromo';
  *   wall. /join renders inline sign-in and preserves the join path.
  *   (Owner's original param was viewer -> tournament page; switched 2026-09-21
  *   per Instinct's finding. One-line revert restores it.)
+ * - Interstitial shows on page load AND on every player login (the app fires
+ *   KHELO_PLAYER_LOGIN_EVENT whenever a player identity is chosen).
  * - Admin (sessionStorage admin session) -> untouched, no interstitial at all.
  * - Escape hatch (HARD requirement): "Stay on the old site" button or ?stay=1
  *   sets localStorage 'khelo-redirect-stay=1' and the interstitial never shows again.
@@ -27,50 +29,52 @@ const STAY_KEY = 'khelo-redirect-stay';
 const ADMIN_SESSION_KEY = 'ito-admin-session';
 const REDIRECT_SECONDS = 5;
 
+/**
+ * Returns the KheloHQ URL to navigate to, or null when the interstitial is
+ * suppressed (stay bypass taken, admin session, or SSR/no window).
+ */
+function resolveTarget(): string | null {
+  try {
+    const url = new URL(window.location.href);
+    // ?stay=1: persist the bypass and clean the URL.
+    if (url.searchParams.get('stay') === '1') {
+      try {
+        window.localStorage.setItem(STAY_KEY, '1');
+      } catch {
+        // Storage unavailable — interstitial simply shows again next visit.
+      }
+      url.searchParams.delete('stay');
+      window.history.replaceState(null, '', url.toString());
+      return null;
+    }
+    // Escape hatch already taken: never redirect.
+    if (window.localStorage.getItem(STAY_KEY) === '1') return null;
+    // Admin: untouched.
+    if (window.sessionStorage.getItem(ADMIN_SESSION_KEY) === '1') return null;
+
+    // Everyone else — signed-in player, viewer, or unsure identity — goes to
+    // the join page (the tournament page is private for anonymous visitors).
+    return KHELO_JOIN_URL;
+  } catch {
+    // No window (SSR) or other failure: render nothing.
+    return null;
+  }
+}
+
 export function KheloRedirect() {
   const [target, setTarget] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(REDIRECT_SECONDS);
 
   useEffect(() => {
-    try {
-      const url = new URL(window.location.href);
-      // ?stay=1: persist the bypass and clean the URL.
-      if (url.searchParams.get('stay') === '1') {
-        try {
-          window.localStorage.setItem(STAY_KEY, '1');
-        } catch {
-          // Storage unavailable — interstitial simply shows again next visit.
-        }
-        url.searchParams.delete('stay');
-        window.history.replaceState(null, '', url.toString());
-        return;
-      }
-      // Escape hatch already taken: never redirect.
-      if (window.localStorage.getItem(STAY_KEY) === '1') return;
-      // Admin: untouched.
-      if (window.sessionStorage.getItem(ADMIN_SESSION_KEY) === '1') return;
+    setTarget(resolveTarget());
 
-      // Default: viewer / unsure identity -> join page (tournament page is private).
-      let dest = KHELO_JOIN_URL;
-      try {
-        const saved = window.localStorage.getItem(IDENTITY_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved) as {
-            viewing?: boolean;
-            name?: string;
-            teamId?: string;
-          } | null;
-          if (parsed && !parsed.viewing && parsed.name && parsed.teamId) {
-            dest = KHELO_JOIN_URL; // signed-in player
-          }
-        }
-      } catch {
-        // Unparseable identity: stay on the viewer default.
-      }
-      setTarget(dest);
-    } catch {
-      // No window (SSR) or other failure: render nothing.
-    }
+    // Show the interstitial on every player login, not just page load.
+    const onPlayerLogin = () => {
+      const next = resolveTarget();
+      if (next) setTarget(next);
+    };
+    window.addEventListener(KHELO_PLAYER_LOGIN_EVENT, onPlayerLogin);
+    return () => window.removeEventListener(KHELO_PLAYER_LOGIN_EVENT, onPlayerLogin);
   }, []);
 
   useEffect(() => {
