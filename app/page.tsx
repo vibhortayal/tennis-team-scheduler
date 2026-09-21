@@ -69,7 +69,7 @@ import { KnockoutSchedulePanel } from './components/Bracket';
 import { normalizeDate } from './lib/availabilityHelpers';
 import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
-import { IdentityPrompt, MatchModal } from './components/MatchModal';
+import { MatchModal } from './components/MatchModal';
 import { KHELO_JOIN_URL, KheloPromoModal } from './components/KheloPromo';
 import { KheloRedirect } from './components/KheloRedirect';
 import { SmartScheduling } from './components/SmartScheduling';
@@ -143,8 +143,6 @@ export default function Page() {
   const [draft, setDraft] = useState<Draft>(blank('Group A'));
   const [editing, setEditing] = useState<Match | null>(null);
   const [open, setOpen] = useState(false);
-  const [identityPromptOpen, setIdentityPromptOpen] = useState(false);
-  const [pendingIdentityValue, setPendingIdentityValue] = useState('');
   const [kheloPromoOpen, setKheloPromoOpen] = useState(false);
   const kheloPromoShownRef = useRef(false);
   const [note, setNote] = useState('');
@@ -588,6 +586,17 @@ export default function Page() {
         return;
       }
 
+      // Read-only mode: player sign-in is disabled, so a stored player
+      // identity is never restored. The admin session is handled above.
+      if (!savedIdentity.viewing) {
+        try {
+          window.localStorage.removeItem(IDENTITY_KEY);
+        } catch {
+          // Storage unavailable — identity simply isn't restored.
+        }
+        return;
+      }
+
       setIdentity(savedIdentity);
       loadAvailability(savedIdentity);
 
@@ -979,13 +988,9 @@ export default function Page() {
     setNote('');
   };
 
+  // Read-only mode: only the admin can reach this (the button is hidden for
+  // everyone else), so there is no viewer identity-prompt path anymore.
   const startScheduling = () => {
-    if (identity.viewing) {
-      setPendingIdentityValue('');
-      setIdentityPromptOpen(true);
-      return;
-    }
-
     // In the knockout phase the header button opens the player's next
     // bracket fixture instead of a blank group-stage form.
     if (!identity.admin && phase !== 'group' && identity.teamId) {
@@ -999,27 +1004,6 @@ export default function Page() {
     }
 
     begin();
-  };
-
-  const continueWithIdentity = () => {
-    const selected = allPlayers.find((player) => identityValue(player) === pendingIdentityValue);
-
-    if (!selected) {
-      return;
-    }
-
-    chooseIdentity(selected);
-    setIdentityPromptOpen(false);
-    setPendingIdentityValue('');
-    setEditing(null);
-    setFirst(selected.teamId);
-
-    const groupRoster = activeRosters[selected.group] || groups[selected.group];
-    setSecond(groupRoster.find(([id]) => id !== selected.teamId)?.[0] || selected.teamId);
-
-    setDraft(blank(selected.group));
-    setOpen(true);
-    setNote('');
   };
 
   const buildSuggestionMatchContext = (teamHistory: Match[], teamId: string, date: string) => {
@@ -1586,9 +1570,11 @@ export default function Page() {
         </div>
 
         <div className="header-actions">
-          <button className="group-schedule" onClick={startScheduling}>
-            Schedule match
-          </button>
+          {isAdmin && (
+            <button className="group-schedule" onClick={startScheduling}>
+              Schedule match
+            </button>
+          )}
         </div>
 
         <PlayerPicker
@@ -1747,15 +1733,6 @@ export default function Page() {
                 : [...current, opponentId]
             )
           }
-        />
-      )}
-
-      {identityPromptOpen && (
-        <IdentityPrompt
-          value={pendingIdentityValue}
-          onValue={setPendingIdentityValue}
-          onCancel={() => setIdentityPromptOpen(false)}
-          onContinue={continueWithIdentity}
         />
       )}
 
