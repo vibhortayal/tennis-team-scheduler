@@ -1584,17 +1584,27 @@ export default function Page() {
           adminConfigured={isAdminConfigured()}
           onAdminSelect={openAdminLogin}
         />
-
-        {showKheloBanner && (
-          <p className="khelo-banner">
-            Innovation Tennis player?{' '}
-            <a href={KHELO_JOIN_URL} target="_blank" rel="noopener noreferrer">
-              Join KheloHQ
-            </a>{' '}
-            for live scores, ratings &amp; more.
-          </p>
-        )}
       </header>
+
+      {showKheloBanner && (
+        <section className="khelo-moved" aria-label="Tournament moved to KheloHQ">
+          <div className="khelo-moved-text">
+            <h2>This tournament has moved to KheloHQ</h2>
+            <p>
+              This scheduler is now read-only. Live scores, player ratings and match history all
+              live on KheloHQ.
+            </p>
+          </div>
+          <a
+            className="khelo-moved-cta"
+            href={KHELO_JOIN_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join KheloHQ <span aria-hidden="true">→</span>
+          </a>
+        </section>
+      )}
 
       <div className="tabs">
         <button
