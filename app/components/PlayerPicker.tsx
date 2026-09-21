@@ -1,9 +1,8 @@
-import { Identity, allPlayers, identityValue, viewingIdentity } from '../teams';
+import { Identity, identityValue, viewingIdentity } from '../teams';
 
 export function PlayerPicker({
   identity,
   onChange,
-  players,
   adminConfigured,
   onAdminSelect,
 }: {
@@ -13,9 +12,8 @@ export function PlayerPicker({
   adminConfigured?: boolean;
   onAdminSelect?: () => void;
 }) {
-  const playerList = players || allPlayers;
-  const sortedPlayers = [...playerList].sort((a, b) => a.name.localeCompare(b.name));
-
+  // Read-only mode: player sign-in is disabled so all data entry happens on
+  // KheloHQ. The picker keeps the viewer default and the admin login entry.
   return (
     <label className="identity-picker">
       <span className="identity-picker-label">Logged in as</span>
@@ -33,16 +31,9 @@ export function PlayerPicker({
             onAdminSelect?.();
             return;
           }
-          const selected = playerList.find((player) => identityValue(player) === value);
-          if (selected) onChange(selected);
         }}
       >
-        <option value="viewing">Select player ▾</option>
-        {sortedPlayers.map((player) => (
-          <option key={identityValue(player)} value={identityValue(player)}>
-            {player.name}
-          </option>
-        ))}
+        <option value="viewing">Viewer</option>
         {adminConfigured && <option value="admin">🔒 Tournament Admin</option>}
       </select>
     </label>
