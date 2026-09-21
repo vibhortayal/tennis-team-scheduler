@@ -67,6 +67,7 @@ import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { IdentityPrompt, MatchModal } from './components/MatchModal';
 import { KHELO_JOIN_URL, KheloPromoModal } from './components/KheloPromo';
+import { KheloRedirect } from './components/KheloRedirect';
 import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
@@ -1499,6 +1500,7 @@ export default function Page() {
   return (
     <main>
       <Styles />
+      <KheloRedirect />
 
       <header className="top">
         <div>

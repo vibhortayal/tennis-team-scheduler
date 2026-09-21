@@ -95,6 +95,15 @@ export function Styles() {
       .khelo-promo-cta:hover{background:#1e40af}
       .khelo-promo-later{border:0;background:none;color:#8a9a8e;font-size:13px;cursor:pointer;padding:6px}
 
+      .khelo-redirect-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(21,35,26,.72);padding:20px}
+      .khelo-redirect-card{background:#fff;border-radius:18px;padding:36px 32px;max-width:440px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+      .khelo-redirect-kicker{display:inline-block;margin:0 0 12px;padding:4px 12px;border-radius:999px;background:#e8f0fe;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase}
+      .khelo-redirect-card h2{font-size:22px;line-height:1.3;margin:0 0 10px;color:#15231a}
+      .khelo-redirect-sub{color:#5f7064;line-height:1.55;margin:0 0 20px;font-size:14px}
+      .khelo-redirect-cta{display:block;background:#1d4ed8;color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:12px;text-decoration:none;margin-bottom:10px}
+      .khelo-redirect-cta:hover{background:#1e40af}
+      .khelo-redirect-stay{border:0;background:none;color:#8a9a8e;font-size:13px;cursor:pointer;padding:6px;text-decoration:underline}
+
       .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
       .field{display:grid;gap:5px;font-size:13px;font-weight:bold}
       .field-label{font-size:13px;font-weight:bold;color:#15231a}
