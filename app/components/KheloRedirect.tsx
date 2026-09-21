@@ -26,6 +26,9 @@ export const KHELO_TOURNAMENT_URL =
   'https://khelohq.vercel.app/t/c11aa58d-acad-47be-bf2c-bf65d8630375';
 
 const STAY_KEY = 'khelo-redirect-stay';
+export { STAY_KEY as KHELO_STAY_KEY };
+/** Dispatched on window when the stay-on-old-site bypass is taken mid-session. */
+export const KHELO_STAY_EVENT = 'khelo:stay';
 const ADMIN_SESSION_KEY = 'ito-admin-session';
 const REDIRECT_SECONDS = 5;
 
@@ -99,6 +102,7 @@ export function KheloRedirect() {
     } catch {
       // Storage unavailable — just hide for this visit.
     }
+    window.dispatchEvent(new Event(KHELO_STAY_EVENT));
     setTarget(null);
   };
 
