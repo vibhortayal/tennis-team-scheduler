@@ -71,7 +71,7 @@ import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { IdentityPrompt, MatchModal } from './components/MatchModal';
 import { KHELO_JOIN_URL, KheloPromoModal } from './components/KheloPromo';
-import { KheloRedirect, KHELO_STAY_EVENT, KHELO_STAY_KEY } from './components/KheloRedirect';
+import { KheloRedirect } from './components/KheloRedirect';
 import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
 import { Styles } from './components/Styles';
@@ -157,21 +157,9 @@ export default function Page() {
   const [availabilityOpponents, setAvailabilityOpponents] = useState<string[]>([]);
   const [identity, setIdentity] = useState<Identity>(viewingIdentity);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
-  // Header nudge: shown to everyone (players, viewers, admins) unless the
-  // stay-on-old-site bypass was taken.
-  const [showKheloBanner, setShowKheloBanner] = useState(true);
-  useEffect(() => {
-    const sync = () => {
-      try {
-        setShowKheloBanner(window.localStorage.getItem(KHELO_STAY_KEY) !== '1');
-      } catch {
-        // Storage unavailable — keep the banner.
-      }
-    };
-    sync();
-    window.addEventListener(KHELO_STAY_EVENT, sync);
-    return () => window.removeEventListener(KHELO_STAY_EVENT, sync);
-  }, []);
+  // Header nudge: always shown to everyone (players, viewers, admins) —
+  // it is never hidden, even when the stay-on-old-site bypass was taken.
+  const showKheloBanner = true;
   const isAdmin = identity.admin === true;
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [allAvailability, setAllAvailability] = useState<AvailabilitySlot[]>([]);
