@@ -1595,17 +1595,17 @@ export default function Page() {
           adminConfigured={isAdminConfigured()}
           onAdminSelect={openAdminLogin}
         />
-      </header>
 
-      {!identity.viewing && !identity.admin && (
-        <p className="khelo-banner">
-          Innovation Tennis player?{' '}
-          <a href={KHELO_JOIN_URL} target="_blank" rel="noopener noreferrer">
-            Join KheloHQ
-          </a>{' '}
-          for live scores, ratings &amp; more.
-        </p>
-      )}
+        {!identity.viewing && !identity.admin && (
+          <p className="khelo-banner">
+            Innovation Tennis player?{' '}
+            <a href={KHELO_JOIN_URL} target="_blank" rel="noopener noreferrer">
+              Join KheloHQ
+            </a>{' '}
+            for live scores, ratings &amp; more.
+          </p>
+        )}
+      </header>
 
       <div className="tabs">
         <button
