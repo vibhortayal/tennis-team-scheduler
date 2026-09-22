@@ -82,9 +82,14 @@ export function Styles() {
       .modal-card > p{color:#5f7064;line-height:1.55;margin-top:6px}
       .khelo-note{margin:14px 0 0;padding:10px 12px;background:#f2f7ff;border:1px solid #c9dcf7;border-radius:10px;font-size:13px;line-height:1.5;color:#1e3a5f}
       .khelo-note a{color:#1d4ed8;font-weight:700}
-      .khelo-banner{margin:0 0 12px;padding:10px 14px;background:#f2f7ff;border:1px solid #c9dcf7;border-radius:12px;font-size:13px;line-height:1.5;color:#1e3a5f;text-align:center}
-      .khelo-banner a{color:#1d4ed8;font-weight:700}
-      .top .khelo-banner{grid-column:1/-1;margin:0}
+      .khelo-moved{margin:16px 0 0;background:#17231d;color:#fff;border-radius:16px;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+      .khelo-moved-text{flex:1 1 240px;min-width:0}
+      .khelo-moved-text h2{margin:0 0 6px;font-size:22px;line-height:1.25;letter-spacing:-.01em;font-weight:800}
+      .khelo-moved-text p{margin:0;color:#cfe0d4;font-size:14px;line-height:1.55;max-width:62ch}
+      .khelo-moved-cta{display:inline-block;background:#1d4ed8;color:#fff;font-weight:800;font-size:16px;padding:14px 22px;border-radius:12px;text-decoration:none;white-space:nowrap}
+      .khelo-moved-cta:hover{background:#1e40af}
+      .khelo-moved-cta:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+      @media(max-width:640px){.khelo-moved{padding:18px}.khelo-moved-text h2{font-size:19px}.khelo-moved-cta{width:100%;text-align:center}}
       .khelo-promo{position:relative;text-align:center;padding:32px 28px}
       .khelo-promo-close{position:absolute;top:12px;right:14px;border:0;background:none;font-size:16px;color:#8a9a8e;cursor:pointer;padding:6px}
       .khelo-promo-kicker{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:999px;background:#e8f0fe;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase}
