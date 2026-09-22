@@ -62,18 +62,15 @@ import {
   canReseed,
   hasDecidedDownstream,
   knockoutWinnerId,
-  PHASE_LABELS,
   type Phase,
 } from './lib/knockout';
-import { KnockoutSchedulePanel } from './components/Bracket';
 import { normalizeDate } from './lib/availabilityHelpers';
-import { Dashboard } from './components/Dashboard';
 import { PlayerPicker } from './components/PlayerPicker';
 import { MatchModal } from './components/MatchModal';
 import { KHELO_JOIN_URL, KheloPromoModal } from './components/KheloPromo';
 import { KheloRedirect } from './components/KheloRedirect';
-import { SmartScheduling } from './components/SmartScheduling';
 import { StandingsView } from './components/StandingsTable';
+import { fetchKheloStandings, type KheloStandings } from './lib/kheloStandings';
 import { Styles } from './components/Styles';
 import { DateParticipantStatus } from './components/MultiDateCalendar';
 import { AddTeamModal } from './components/AddTeamModal';
@@ -81,15 +78,15 @@ import { ManageTeamsModal, WithdrawalResolution } from './components/ManageTeams
 import { getActiveRoster, NewTeamInput, validateNewTeam } from './lib/teamValidation';
 import { isAdminConfigured, isAdminSession, setAdminSession, clearAdminSession } from './lib/admin';
 import { AdminLogin } from './components/AdminLogin';
-import { ManageTab } from './components/ManageTab';
-
-type View = 'dashboard' | 'scheduling' | 'standings' | 'manage';
 
 export default function Page() {
-  const [view, setView] = useState<View>('dashboard');
   const [group, setGroup] = useState<Group>('Group A');
   const [scheduleGroup, setScheduleGroup] = useState<Group>('Group A');
   const [standingsGroup, setStandingsGroup] = useState<Group>('Group A');
+  // Standings-only mode: standings come live from the KheloHQ tables.
+  const [kheloStandings, setKheloStandings] = useState<KheloStandings | null>(null);
+  const [kheloError, setKheloError] = useState<string | null>(null);
+  const [kheloLoading, setKheloLoading] = useState(true);
   const [matches, setMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<TeamRecord[]>([...initialStaticTeams]);
   const [addTeamOpen, setAddTeamOpen] = useState(false);
@@ -498,6 +495,25 @@ export default function Page() {
     loadTeams();
   }, [loadTeams]);
 
+  // Standings-only mode: live standings from the KheloHQ tables.
+  useEffect(() => {
+    let cancelled = false;
+    fetchKheloStandings()
+      .then((result) => {
+        if (!cancelled) setKheloStandings(result);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled)
+          setKheloError(error instanceof Error ? error.message : 'Failed to load standings.');
+      })
+      .finally(() => {
+        if (!cancelled) setKheloLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadAvailability = useCallback(async (player: Identity) => {
     if (player.viewing || player.admin || !availabilityApi || !key) {
       setAvailability([]);
@@ -685,11 +701,6 @@ export default function Page() {
       window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(nextIdentity));
     }
 
-    // Leaving the admin role drops out of the management UI.
-    if (view === 'manage') {
-      setView('dashboard');
-    }
-
     // Default the team-scope dropdown to the new identity's team.
     const defaultTeam = nextIdentity.viewing ? '' : nextIdentity.teamId;
     identityTeamDefaultRef.current = defaultTeam;
@@ -702,7 +713,6 @@ export default function Page() {
     loadAvailability(nextIdentity);
 
     if (!nextIdentity.viewing) {
-      setView('dashboard');
       setGroup(nextIdentity.group);
       setScheduleGroup(nextIdentity.group);
       setStandingsGroup(nextIdentity.group);
@@ -1591,8 +1601,12 @@ export default function Page() {
           <div className="khelo-moved-text">
             <h2>This tournament has moved to KheloHQ</h2>
             <p>
-              This scheduler is now read-only. Live scores, player ratings and match history all
-              live on KheloHQ.
+              This scheduler is now read-only. To update scores, check standings, or
+              schedule/reschedule matches, go to{' '}
+              <a href={KHELO_JOIN_URL} target="_blank" rel="noopener noreferrer">
+                KheloHQ
+              </a>
+              .
             </p>
           </div>
           <a
@@ -1606,143 +1620,26 @@ export default function Page() {
         </section>
       )}
 
-      <div className="tabs">
-        <button
-          className={view === 'dashboard' ? 'active' : ''}
-          onClick={() => setView('dashboard')}
-        >
-          Match Dashboard
-        </button>
-
-        <button
-          className={view === 'standings' ? 'active' : ''}
-          onClick={() => setView('standings')}
-        >
-          Standings
-        </button>
-
-        {/* Smart Scheduling is a player tool in the group phase (personal
-            availability + matchup suggestions); the admin has no team, so
-            hide it for admin until the knockout phase, where this tab
-            becomes the bracket scheduling panel. */}
-        {(!isAdmin || phase !== 'group') && (
-          <button
-            className={view === 'scheduling' ? 'active' : ''}
-            onClick={() => setView('scheduling')}
-          >
-            Smart Scheduling
-          </button>
-        )}
-
-        {isAdmin && (
-          <button className={view === 'manage' ? 'active' : ''} onClick={() => setView('manage')}>
-            ⚙ Manage
-          </button>
-        )}
-      </div>
+      {/* Standings-only mode: the tournament runs on KheloHQ. The tab bar and
+          all other views (Match Dashboard, Smart Scheduling, Manage) are
+          removed; only live KheloHQ standings are shown. */}
 
       {note && <p className="notice">{note}</p>}
 
-      {phase !== 'group' && (
-        <p className="phase-banner" role="status">
-          🏆 {PHASE_LABELS[phase]} — group standings are frozen.
+      {kheloLoading ? (
+        <p className="empty">Loading standings…</p>
+      ) : kheloError ? (
+        <p className="notice" role="alert">
+          Could not load standings: {kheloError}
         </p>
-      )}
-
-      {view === 'dashboard' ? (
-        <Dashboard
-          matches={matches}
-          overdue={overdue}
-          upcoming={upcoming}
-          completed={completed}
-          cancelled={cancelled}
-          group={group}
-          filter={filter}
-          team={team}
-          identity={identity}
-          roster={roster}
-          rosters={activeRosters}
-          onGroupChange={setGroup}
-          onFilterChange={setFilter}
-          onTeamChange={handleTeamChange}
-          onEdit={begin}
-          onAddTeam={isAdmin ? () => setAddTeamOpen(true) : undefined}
-          onManageTeams={isAdmin ? () => setManageTeamsOpen(true) : undefined}
-          phase={phase}
-          knockoutMatches={knockoutMatches}
-          standingsA={standingsA}
-          standingsB={standingsB}
-        />
-      ) : view === 'standings' ? (
+      ) : (
         <StandingsView
-          standingsA={standingsA}
-          standingsB={standingsB}
+          standingsA={kheloStandings?.standingsA ?? []}
+          standingsB={kheloStandings?.standingsB ?? []}
           standingsGroup={standingsGroup}
           onGroupChange={setStandingsGroup}
           selectedTeamId={identity.viewing ? null : identity.teamId}
-          matches={matches}
-          isFinal={phase !== 'group'}
-        />
-      ) : view === 'manage' && isAdmin ? (
-        <ManageTab
-          matches={matches}
-          onEdit={begin}
-          onAddTeam={() => setAddTeamOpen(true)}
-          onManageTeams={() => setManageTeamsOpen(true)}
-          phase={phase}
-          canReseed={canReseed(matches)}
-          onSeed={seedKnockouts}
-          onReseed={reseedKnockouts}
-          onWalkover={resolveStragglerWalkover}
-          onVoid={resolveStragglerVoid}
-        />
-      ) : view === 'scheduling' && phase !== 'group' ? (
-        <KnockoutSchedulePanel
-          matches={matches}
-          identity={identity}
-          phase={phase}
-          onSchedule={begin}
-        />
-      ) : (
-        <SmartScheduling
-          identity={identity}
-          scheduleGroup={scheduleGroup}
-          suggestionTeam={suggestionTeam}
-          yourGapDays={yourGapDays}
-          opponentGapDays={opponentGapDays}
-          suggestions={suggestions}
-          visibleSuggestions={visibleSuggestions}
-          opponentOptions={opponentOptions}
-          suggestionOpponent={suggestionOpponent}
-          suggestionNote={suggestionNote}
-          matches={matches}
-          onYourGap={setYourGapDays}
-          onOpponentGap={setOpponentGapDays}
-          onFind={findSuggestions}
-          onOpponentFilter={setSuggestionOpponent}
-          onSchedule={scheduleSuggestion}
-          availabilitySlots={availabilitySlots}
-          blockingSlots={blockingSlots}
-          teamMatches={teamMatches}
-          participantStatusMap={participantStatusMap}
-          availabilitySaving={availabilitySaving}
-          availabilityError={availabilityError}
-          onSaveSlot={saveSlot}
-          onDeleteSlot={deleteSlot}
-          partnerName={partnerName}
-          partnerReady={partnerReady}
-          pendingMatchCount={pendingOpponentIds.length}
-          pendingOpponentIds={pendingOpponentIds}
-          opponentMissingNames={opponentMissingNames}
-          availabilityOpponents={availabilityOpponents}
-          allAvailability={allAvailability}
-          onAvailabilityOpponentToggle={(opponentId) =>
-            setAvailabilityOpponents((current) =>
-              current.includes(opponentId)
-                ? current.filter((id) => id !== opponentId)
-                : [...current, opponentId]
-            )
-          }
+          qualifyingPositions={1}
         />
       )}
 
