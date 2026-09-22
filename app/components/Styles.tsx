@@ -395,15 +395,12 @@ export function Styles() {
       }
       .permission-note{font-size:12px;color:#758278;margin:4px 0 0}
 
-      /* === Standings team button + team match history dialog === */
-      .standings-team-btn{
+      /* === Standings team label (plain text, not a link) === */
+      .standings-team-label{
         display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-        background:none;border:none;padding:2px 4px;margin:-2px -4px;
-        font:inherit;color:inherit;text-align:left;cursor:pointer;border-radius:6px;
+        padding:2px 0;
+        font:inherit;color:inherit;text-align:left;
       }
-      .standings-team-btn:hover .team-number,
-      .standings-team-btn:hover .standings-team-players{color:#147a42;text-decoration:underline}
-      .standings-team-btn:focus-visible{outline:2px solid #147a42;outline-offset:2px}
       .team-history-modal{width:min(620px,100%)}
       .team-history-sub{margin-top:-8px}
       .team-history-modal section{margin-top:18px}

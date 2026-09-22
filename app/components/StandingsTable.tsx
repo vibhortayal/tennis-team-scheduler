@@ -1,12 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { Group } from '../teams';
-import { Match } from '../lib/matches';
 import { TeamStandingRow } from '../lib/scoring';
-import { TeamMatchHistoryModal } from './TeamMatchHistoryModal';
-
-const QUALIFYING_POSITIONS = 4;
 
 function nsr(value: number): string {
   if (value > 0) return `+${value}`;
@@ -17,12 +12,13 @@ export function StandingsTable({
   rows,
   group,
   selectedTeamId,
-  onTeamSelect,
+  qualifyingPositions = 4,
 }: {
   rows: TeamStandingRow[];
   group: Group;
   selectedTeamId?: string | null;
-  onTeamSelect: (teamId: string, trigger: HTMLButtonElement | null) => void;
+  /** Teams qualifying per group (KheloHQ: 1 for Innovation's Groups → Final). */
+  qualifyingPositions?: number;
 }) {
   if (rows.length === 0) {
     return (
@@ -72,7 +68,7 @@ export function StandingsTable({
 
           <tbody>
             {rows.map((row) => {
-              const qualifying = row.groupRank <= QUALIFYING_POSITIONS;
+              const qualifying = row.groupRank <= qualifyingPositions;
               const isOwnTeam = selectedTeamId === row.teamId;
               const rowClass = [
                 qualifying ? 'standings-qualifying' : '',
@@ -98,15 +94,10 @@ export function StandingsTable({
                   </td>
 
                   <td className="standings-team-cell">
-                    <button
-                      type="button"
-                      className="standings-team-btn"
-                      onClick={(event) => onTeamSelect(row.teamId, event.currentTarget)}
-                      aria-label={`View matches for Team ${row.teamId}`}
-                    >
+                    <span className="standings-team-label">
                       <span className="team-number">#{row.teamId}</span>
                       <span className="standings-team-players">{row.players}</span>
-                    </button>
+                    </span>
                     {isOwnTeam && (
                       <span className="standings-you" aria-label="Your team">
                         YOU
@@ -148,7 +139,9 @@ export function StandingsTable({
         </table>
       </div>
 
-      <p className="standings-footnote">Ranked by points, then Net Score Rate. Top 4 qualify.</p>
+      <p className="standings-footnote">
+        Ranked by points, then Net Score Rate. Top {qualifyingPositions} qualify.
+      </p>
     </div>
   );
 }
@@ -159,38 +152,20 @@ export function StandingsView({
   standingsGroup,
   onGroupChange,
   selectedTeamId,
-  matches,
   isFinal,
+  qualifyingPositions,
 }: {
   standingsA: TeamStandingRow[];
   standingsB: TeamStandingRow[];
   standingsGroup: Group;
   onGroupChange: (g: Group) => void;
   selectedTeamId?: string | null;
-  matches: Match[];
   /** The group stage is over: standings are frozen, top 4 qualified. */
   isFinal?: boolean;
+  /** Teams qualifying per group (KheloHQ: 1 for Innovation's Groups → Final). */
+  qualifyingPositions?: number;
 }) {
   const rows = standingsGroup === 'Group A' ? standingsA : standingsB;
-  const [historyTeamId, setHistoryTeamId] = useState<string | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-
-  // If the group tab changes while the dialog is open, close it so the
-  // dialog never shows matches from the wrong group.
-  useEffect(() => {
-    setHistoryTeamId(null);
-  }, [standingsGroup]);
-
-  const openHistory = (teamId: string, trigger: HTMLButtonElement | null) => {
-    triggerRef.current = trigger;
-    setHistoryTeamId(teamId);
-  };
-
-  const closeHistory = () => {
-    setHistoryTeamId(null);
-    // Return focus to the team button that opened the dialog.
-    triggerRef.current?.focus();
-  };
 
   return (
     <>
@@ -216,17 +191,8 @@ export function StandingsView({
         rows={rows}
         group={standingsGroup}
         selectedTeamId={selectedTeamId}
-        onTeamSelect={openHistory}
+        qualifyingPositions={qualifyingPositions}
       />
-
-      {historyTeamId && (
-        <TeamMatchHistoryModal
-          teamId={historyTeamId}
-          group={standingsGroup}
-          matches={matches}
-          onClose={closeHistory}
-        />
-      )}
     </>
   );
 }
